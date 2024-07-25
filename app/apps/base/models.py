@@ -194,16 +194,64 @@ def calculate_expired_at(target, value, oldvalue, initiator):
 ### USAGES
 
 
-"""
-- when user try to use a service/product that is not free, business will ask us if this user have any active enrollmemt to use this product or not.
-- A function called "approve_usage" will check if this user have any active enrollmemt to use this product or not.
-- "approve_usage" actions:
-   - get all active(not expired) enrollments for user_id in the requested business_id
-   -
 
+def approve_usage(user_id: uuid.UUID, business_id: uuid.UUID, on_item=None):
+    """
+        - when user try to use a service/product that is not free, business will ask us if this user have any active enrollmemt with proper remaining resource to use this product or not.
+        - A function called "approve_usage" will check if this user have any active enrollmemt to use this product or not.
+        - "approve_usage" actions:
+            - get all active(not expired) enrollments for user_id in the requested business_id
+            - if 
+                - on_item in request is not none, then:
+                    - check on_item of request and the list of enrollments from previous step.
+                    - select the enrollment which contain the on_item in the list.
+                    - if there is more than 1 enrollment with these conditions, then select the enrollment which expire sooner than others.
+                - else :
+                    - select the enrollment which expire sooner than others.
+            - if previous step has a result, then respond:
+                - yes. also respond the enrollment_id and current remain_resources.
+                - else:
+                - no, and the massage "there is not sufficient enrollment to approve your request"
+        """
+    enrollments = session.query(Enrollments).filter(
+        Enrollments.user_id == user_id,
+        Enrollments.business_id == business_id,
+        Enrollments.is_deleted == False,
+        Enrollments.expired_at > datetime.now(timezone.utc)
+    ).all()
 
-"""
+    if on_item:
+        # Filter by on_item
+        enrollments = [e for e in enrollments if on_item in e.plan['resources']]
+        # Select the enrollment that expires sooner
+        enrollments = sorted(enrollments, key=lambda e: e.expired_at)
+        if enrollments:
+            selected_enrollment = enrollments[0]
+        else:
+            return None, "There is not sufficient enrollment to approve your request"
+    else:
+        # Select the enrollment that expires sooner
+        enrollments = sorted(enrollments, key=lambda e: e.expired_at)
+        if enrollments:
+            selected_enrollment = enrollments[0]
+        else:
+            return None, "There is not sufficient enrollment to approve your request"
 
+    # Check if there are enough remaining resources
+    remaining_resources = selected_enrollment.plan['resources']
+    if on_item:
+        remaining_resources = remaining_resources[remaining_resources['resource'] == on_item]
+    if remaining_resources['limit'] <= 0:
+        return None, "There is not sufficient remaining resources to approve your request"
+
+    # Update the remaining resources
+    remaining_resources['limit'] -= 1
+    selected_enrollment.plan['resources'] = remaining_resources
+
+    # Save the changes
+    session.commit()
+
+    return selected_enrollment, remaining_resources
 
 
 
@@ -211,14 +259,14 @@ class Usages(ImmutableBase):
    """
    usages table description:
    - it is an immutable table.
-   - the    function will call. the respond:
-       - if yes, then it will create a new row in usages table.
-       - if no, then the ValueError is "There are no sufficient plans to approve this request")
+   - After "approve_usage" respond yes, it will create a new row in usages table.
+   - it has a "type" attribute, the possible values are:
+        - "ENROLLMENT" : when user enrolled for a subscription/plan/package. in this case the "metadata" will contain the plan data and remain_resources will increase in comparision with the previous record in usages table.
+        - "USAGE" : when user try to use a product that included in the subscription/plan/package. in this case the remain_resources will decrease in comparision with the previous record in usages table.
    - this table is contains with:
        - uid
        - created_at
        - metadata
-       - is_deleted
        - business_id
        - user_id
        - enrollment_id
@@ -233,7 +281,6 @@ class Usages(ImmutableBase):
    uid: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4, unique=True, index=True)
    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-   is_deleted: Mapped[bool] = mapped_column(default=False)
    business_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("Business.uid"), index=True)
    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("User.uid"), index=True)
    enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("Enrollments.uid"), index=True)
