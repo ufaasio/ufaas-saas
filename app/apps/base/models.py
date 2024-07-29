@@ -135,7 +135,30 @@ class ImmutableBusinessOwnedEntity(ImmutableBase, BusinessOwnedEntity):
 
 
 ## base Apps are below
-
+"""
+Plans/subscriptions/packages table description:
+We are not supporting Plans/subscriptions/packages for now.
+But we have a suggestion for the it's data model.
+The data model for plans/subscriptions/packages is as follows:
+- uid: Unique identifier for the plan (uuid)
+- created_at: Date and time the plan was created (datetime)
+- updated_at: Date and time the plan was last updated (datetime)
+- metadata: Additional metadata for the plan (null)
+- is_deleted: Indicates if the plan is active or not (false)
+- business_id: Unique identifier for the business (uuid)
+- name: Name of the plan (e.g., "20G monthly")
+- description: Description of the plan (e.g., "Unlimited data for 20GB")
+- price: Price of the plan (e.g., 100)
+- currency: Currency of the price (e.g., "KT")
+- is_active: Indicates if the plan is active for enrollment (true or false)
+- category: Category of the plan (empty string)
+- data: Container for plan details
+  - duration: Duration of the plan in days (e.g., 90)
+  - resources: List of resource limits
+    - resource: Name of the resource (e.g., "API Calls")
+    - limit: Amount of the resource limit (e.g., 1000)
+  - on_items: List of specific items (null or empty)
+"""
 
 ### ENROLLMENTS
 
@@ -168,7 +191,6 @@ class Enrollments(BaseEntity):
    updated_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), onupdate=func.now())
    metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-
 def calculate_expired_at(plan: dict) -> datetime:
    """
    Calculate the expired_at time based on the plan duration.
@@ -192,66 +214,6 @@ def calculate_expired_at(target, value, oldvalue, initiator):
 
 
 ### USAGES
-
-
-
-def approve_usage(user_id: uuid.UUID, business_id: uuid.UUID, on_item=None):
-    """
-        - when user try to use a service/product that is not free, business will ask us if this user have any active enrollmemt with proper remaining resource to use this product or not.
-        - A function called "approve_usage" will check if this user have any active enrollmemt to use this product or not.
-        - "approve_usage" actions:
-            - get all active(not expired) enrollments for user_id in the requested business_id
-            - if 
-                - on_item in request is not none, then:
-                    - check on_item of request and the list of enrollments from previous step.
-                    - select the enrollment which contain the on_item in the list.
-                    - if there is more than 1 enrollment with these conditions, then select the enrollment which expire sooner than others.
-                - else :
-                    - select the enrollment which expire sooner than others.
-            - if previous step has a result, then respond:
-                - yes. also respond the enrollment_id and current remain_resources.
-                - else:
-                - no, and the massage "there is not sufficient enrollment to approve your request"
-        """
-    enrollments = session.query(Enrollments).filter(
-        Enrollments.user_id == user_id,
-        Enrollments.business_id == business_id,
-        Enrollments.is_deleted == False,
-        Enrollments.expired_at > datetime.now(timezone.utc)
-    ).all()
-
-    if on_item:
-        # Filter by on_item
-        enrollments = [e for e in enrollments if on_item in e.plan['resources']]
-        # Select the enrollment that expires sooner
-        enrollments = sorted(enrollments, key=lambda e: e.expired_at)
-        if enrollments:
-            selected_enrollment = enrollments[0]
-        else:
-            return None, "There is not sufficient enrollment to approve your request"
-    else:
-        # Select the enrollment that expires sooner
-        enrollments = sorted(enrollments, key=lambda e: e.expired_at)
-        if enrollments:
-            selected_enrollment = enrollments[0]
-        else:
-            return None, "There is not sufficient enrollment to approve your request"
-
-    # Check if there are enough remaining resources
-    remaining_resources = selected_enrollment.plan['resources']
-    if on_item:
-        remaining_resources = remaining_resources[remaining_resources['resource'] == on_item]
-    if remaining_resources['limit'] <= 0:
-        return None, "There is not sufficient remaining resources to approve your request"
-
-    # Update the remaining resources
-    remaining_resources['limit'] -= 1
-    selected_enrollment.plan['resources'] = remaining_resources
-
-    # Save the changes
-    session.commit()
-
-    return selected_enrollment, remaining_resources
 
 
 
@@ -288,4 +250,47 @@ class Usages(ImmutableBase):
    resource: Mapped[str] = mapped_column(index=True)
    volume: Mapped[int] = mapped_column(index=True)
    remain_resources: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+
+
+
+    """
+    A function called "add_enrollment_to_usages" add an enrollment to usages table.
+    After an enrollment added to enrollments table, there should be a new record in usages table.
+    For a user_id in a business_id and on_item, resource and volume, create a new record in usages table. if there is a similar record in usages table, then increase the remain_resources by the new volume. if there is not, create a new record.
+    Args:
+        user_id (uuid.UUID): The ID of the user.
+        business_id (uuid.UUID): The ID of the business.
+        on_item (str): The specific item to check.
+        resource (str): The resource that user requested to make a usage.
+        volume (int): The volume that user requested to make a usage.
+    """
+    
+
+def usage_checker(user_id: uuid.UUID, business_id: uuid.UUID, on_item=None, resource=None, volume=None):
+    """
+    A function called "usage_checker" checks if a user has an active enrollment that can fulfill the requested usage.
+    Args:
+        user_id (uuid.UUID): The ID of the user.
+        business_id (uuid.UUID): The ID of the business.
+        on_item (str, optional): The specific item to check. Defaults to None.
+        resource (str): The resource that user requested to make a usage.
+        volume (int): The volume that user requested to make a usage.
+
+    Returns:
+        Tuple[Enrollments, Dict[str, int]]: The enrollment and remaining resources if the usage can be fulfilled.
+        Tuple[None, str]: An error message if the usage cannot be fulfilled.
+    - The function performs the following steps:
+        - Get all active enrollments for the user in the requested business.
+        - If an on_item is specified, filter the enrollments.plan.data.on_item to include only those
+          that have the requested on_item.
+        - Select the enrollment that expires soonest.
+        - filter Usages table with the selected enrollment id. From Usages.remain_resources.resource table, Check if the remaining resources volume in the selected enrollment can satisfy
+          the requested usage. 
+        - If enough resource volume are available, return the enrollment_id and current
+          remaining resources.
+        - If no enrollment can satisfy the request, return an error message.
+    """
+    
+
 
