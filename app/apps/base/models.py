@@ -281,10 +281,15 @@ class Usages(ImmutableBase):
         target.enrollment_id = enrollment_id
 
     @classmethod
-    def reduce_enrollment_resource(cls, mapper, connection, target):
+    def change_enrollment_resource(cls, mapper, connection, target):
         """
-        when a record is created on usages table, we need to reduce the resource volume of the enrollment by the volume of the usage.
+        change the "reduce_enrollment_resource" to "change_enrollment_resource"
+        as input get an enrollments_id and requested usage record and change_type : decrease or increase.
+        change the the limit of resource in remain_resources in enrollment by corosponding value of resource in usage resource.
         """
+        change_type = target.change_type
+        if change_type not in ["decrease", "increase"]:
+            raise ValueError("change_type must be 'decrease' or 'increase'")
         enrollment = connection.execute(
             select(Enrollments).where(
                 Enrollments.uid == target.enrollment_id
@@ -292,7 +297,10 @@ class Usages(ImmutableBase):
         ).first()
         remain_resources = enrollment.remain_resources
         resource_volume = remain_resources[target.resource]
-        remain_resources[target.resource] = resource_volume - target.volume
+        if change_type == "decrease":
+            remain_resources[target.resource] = resource_volume - target.volume
+        elif change_type == "increase":
+            remain_resources[target.resource] = resource_volume + target.volume
         connection.execute(
             Enrollments.update().where(
                 Enrollments.uid == target.enrollment_id
