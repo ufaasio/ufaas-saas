@@ -142,7 +142,6 @@ class Enrollments(BaseEntity):
     the model is mentiond in selected text.
     the "plan" field is an object. inner of plan, there is a field called "duration". the "expired_at" field of enrollments should be calculate by here using "duration" field of plan. add duration to "started_at".
     the "plan" field is also has a field "resources". the "remain_resource" field of enrollments is set to be equal to "resources" field of plan at the moment of record creation.
-    
     """
     __tablename__ = "enrollments"
 
@@ -153,8 +152,9 @@ class Enrollments(BaseEntity):
     started_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
     expired_at: Mapped[datetime] = mapped_column(index=True)
     plan: Mapped[dict] = mapped_column(nullable=True)
+    on_item: Mapped[str] = mapped_column(nullable=True)
+    resources: Mapped[dict] = mapped_column(nullable=True)
     remain_resources: Mapped[dict] = mapped_column(nullable=True)
-    
 
     @validates("expired_at")
     def expired_at_calculator(self, key, expired_at):
@@ -177,7 +177,15 @@ class Enrollments(BaseEntity):
 
     @classmethod
     def set_remain_resource(cls, mapper, connection, target):
-        target.remain_resources = target.plan.get('resources', {})
+        """
+        at the moment of record creation the remain_resources is empthy. it should give the value of "enrollments.resources" at that momnet once.
+        """
+        enrollment = connection.execute(
+            select(Enrollments).where(
+                Enrollments.uid == target.enrollment_id
+            )
+        ).first()
+        target.remain_resources = enrollment.resources.copy()
 
     
 ##### End of Enrollments ####
@@ -196,6 +204,10 @@ class Usages(ImmutableBase):
     volume: Mapped[int] = mapped_column()
     on_item: Mapped[str] = mapped_column(index=True)
 
+    @classmethod
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        event.listen(cls, 'before_insert', cls.check_enrollment_condition)
 
     @classmethod
     def check_enrollment_condition(cls, mapper, connection, target):
@@ -218,7 +230,7 @@ class Usages(ImmutableBase):
           If there is not enough resource value in the remain_resources, a ValueError is raised mentioning the resource name, 
           the remain resource volume, and mentioning that it is remaining.
         
-        If there are multiple enrollments, the one with the smallest expired_at will be returned.
+        at last, If there are multiple enrollments, the one with the smallest expired_at will be returned.
         """ 
         current_time = datetime.now(timezone.utc)
         requested_resource = target.resource
@@ -231,67 +243,33 @@ class Usages(ImmutableBase):
             Enrollments.user_id == requested_user_id,
             Enrollments.business_id == requested_business_id,
             Enrollments.on_item == requested_on_item,
-            Enrollments.expired_at > current_time
+            Enrollments.expired_at > current_time,
+            func.jsonb_exists(Enrollments.remain_resources, requested_resource)
         ).all()
+        if enrollments is None:
+            raise ValueError("There is no valid enrollment for the requested usage.")
         
-        valid_enrollment = None
+        valid_enrollments = None
         for enrollment in enrollments:
-            if requested_resource not in enrollment.remain_resources:
-                raise ValueError(f"{requested_resource} is not exist in the remain_resources of the enrollment.")
-            
+                        
             if requested_volume > enrollment.remain_resources[requested_resource]:
                 raise ValueError(f"{requested_resource} has {enrollment.remain_resources[requested_resource]} resources remain, but requested {requested_volume} resources. it is remaining.")
             
             if valid_enrollment is None or enrollment.expired_at < valid_enrollment.expired_at:
-                valid_enrollment = enrollment
+                valid_enrollments.append(enrollment)
         
-        if valid_enrollment is None:
+        if valid_enrollments is None:
             raise ValueError("There is no valid enrollment for the requested usage.")
         
+        if len(valid_enrollments) > 1:
+            valid_enrollments.sort(key=lambda enrollment: enrollment.expired_at)
+            valid_enrollment = valid_enrollments[0]
+        else:
+            valid_enrollment = valid_enrollments[0]
+
         return valid_enrollment
     
 
-    @classmethod
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-        event.listen(cls, 'before_insert', cls.check_enrollment_condition)
-
-    @classmethod
-    def check_enrollment_condition(cls, mapper, connection, target):
-        """
-        when a usage requested on usages table, before create a record, we need to check if there is any valid enrollment that can be used for the requested usage.
-        If there is one, so return it as a valid enrollment. Otherwise, if there is no valid enrollment, raise ValueError.
-        - these items from usages request should ne equal to enrollment record.
-            user_id
-            business_id
-            on_item
-            resource from usages should be exist it the remain_resources dictionary that maye contains several resources and value of each in the enrollment. the remain_resources is like this: {"cpu": 1, "memory": 2, "disk": 3}. in raising ValueError if there is no, then mention resource name.
-        - the "expired_at" field of enrollments should be greater than the current time.
-        - the valume of requested usage should be less than or equal to the remain resource value of the resource in the enrollment. in valueError if there is not enough resource value in the remain_resources, mention the resource name and the remain resource volume and mention this is remaind.
-        - if there is more than 1 enrollment, the one with the smallest expired_at will be returned.
-
-        """        
-        enrollments = connection.execute(
-            select(Enrollments).where(
-                Enrollments.user_id == target.user_id,
-                Enrollments.business_id == target.business_id,
-                Enrollments.on_item == target.on_item,
-                Enrollments.expired_at > datetime.now(timezone.utc)
-            )
-        ).all()
-        if not enrollments:
-            raise ValueError("No valid enrollment found")
-        enrollment = min(enrollments, key=lambda e: e.expired_at)
-        remain_resources = enrollment.remain_resources
-        if remain_resources is None:
-            raise ValueError("No remain resources found")
-        resource_volume = remain_resources.get(target.resource)
-        if resource_volume is None:
-            raise ValueError("No resource volume found")
-        resource_volume = remain_resources.get(target.resource)
-        if resource_volume < target.volume:
-            raise ValueError(f"Remain resource volume of {resource_volume} is not enough")
-        return enrollment.uid
 
     
     @classmethod
