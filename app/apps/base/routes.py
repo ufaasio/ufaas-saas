@@ -24,6 +24,7 @@ router = APIRouter()
 
 @router.get("/enrollments", response_model=list[Enrollments])
 async def get_enrollments(
+    """ Rerurn list of Enrollments """
     business_id: uuid.UUID,
     user_id: Optional[uuid.UUID] = None,
     started_at: Optional[datetime] = None,
@@ -56,6 +57,7 @@ async def get_enrollments(
 ##### get single Enrollments ####
 @router.get("/enrollments/{enrollments_id}", response_model=Enrollments)
 async def get_enrollment(
+    """ Rerurn single Enrollments """
     enrollments_id: uuid.UUID, settings: Settings = fastapi.Depends(Settings)
 ):
     return Enrollments.query.get(enrollments_id)
@@ -64,6 +66,7 @@ async def get_enrollment(
 ##### create an Enrollment ####
 @router.post("/enrollments", response_model=Enrollments)
 async def create_enrollment(
+    """ Create an Enrollments """"
     business_id: uuid.UUID,
     user_id: uuid.UUID,
     invoice_id: uuid.UUID,
@@ -88,6 +91,7 @@ async def create_enrollment(
 ##### update an Enrollment ####
 @router.put("/enrollments/{enrollments_id}", response_model=Enrollments)
 async def update_enrollment(
+    """ Update an Enrollments """
     enrollments_id: uuid.UUID,
     business_id: uuid.UUID,
     user_id: uuid.UUID,
@@ -112,6 +116,7 @@ async def update_enrollment(
 ##### delete an Enrollment ####
 @router.delete("/enrollments/{enrollments_id}", response_model=Enrollments)
 async def delete_enrollment(
+    """ Delete an Enrollments """
     enrollments_id: uuid.UUID,
     settings: Settings = fastapi.Depends(Settings),
 ):
@@ -127,6 +132,7 @@ async def delete_enrollment(
 ##### get list of Usages #####
 @router.get("/usages", response_model=list[Usages])
 async def get_usages(
+    """ Rerurn list of Usages """
     business_id: uuid.UUID,
     user_id: Optional[uuid.UUID] = None,
     resource: Optional[str] = None,
@@ -148,12 +154,14 @@ async def get_usages(
 ##### get single Usages ####
 @router.get("/usages/{usages_id}", response_model=Usages)
 async def get_usage(usages_id: uuid.UUID, settings: Settings = fastapi.Depends(Settings)):
+    """ Rerurn single Usages """
     return Usages.query.get(usages_id)
 
 
 ##### create an Usage ####
 @router.post("/usages", response_model=uuid.UUID)
 async def create_usage(
+    """ Create an Usage """
     user_id: uuid.UUID,
     business_id: uuid.UUID,
     on_item: str,
@@ -210,6 +218,7 @@ The purpose of this endpoint is to reverse the effect of creating a usage by dec
 """
 @router.delete("/usages/{usage_id}", response_model=uuid.UUID)
 async def delete_usage(
+    """ Delete an Usage """
     usage_id: uuid.UUID,
     settings: Settings = fastapi.Depends(Settings),
 ):
