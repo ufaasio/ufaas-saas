@@ -281,13 +281,12 @@ class Usages(ImmutableBase):
         target.enrollment_id = enrollment_id
 
     @classmethod
-    def change_enrollment_resource(cls, mapper, connection, target):
+    def change_enrollment_resource(cls, mapper, connection, target, change_type):
         """
         change the "reduce_enrollment_resource" to "change_enrollment_resource"
         as input get an enrollments_id and requested usage record and change_type : decrease or increase.
         change the the limit of resource in remain_resources in enrollment by corosponding value of resource in usage resource.
         """
-        change_type = target.change_type
         if change_type not in ["decrease", "increase"]:
             raise ValueError("change_type must be 'decrease' or 'increase'")
         enrollment = connection.execute(
