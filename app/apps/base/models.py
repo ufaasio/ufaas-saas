@@ -136,18 +136,15 @@ class ImmutableBusinessOwnedEntity(ImmutableBase, BusinessOwnedEntity):
 
 
 #### Start of Enrollments ####
-class Enrollments(BaseEntity):
+class Enrollments(BusinessOwnedEntity):
     """
-    enrollments is a mutable table using class BaseEntity.
+    enrollments is a mutable table using class BusinessOwnedEntity.
     the model is mentiond in selected text.
     the "plan" field is an object. inner of plan, there is a field called "duration". the "expired_at" field of enrollments should be calculate by here using "duration" field of plan. add duration to "started_at".
     the "plan" field is also has a field "resources". the "remain_resource" field of enrollments is set to be equal to "resources" field of plan at the moment of record creation.
     """
     __tablename__ = "enrollments"
 
-    uid: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4, index=True, unique=True)
-    business_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(index=True)
     invoice_id: Mapped[uuid.UUID] = mapped_column(index=True)
     started_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
     expired_at: Mapped[datetime] = mapped_column(index=True)
@@ -193,12 +190,10 @@ class Enrollments(BaseEntity):
 #### Start of Usages ####
 class Usages(ImmutableBase):
     """
-    the Usages is an immutable table. using class ImmutableBase.
+    the Usages is an immutable table. using class ImmutableBusinessOwnedEntity.
     """
     __tablename__ = "usages"
 
-    business_id: Mapped[uuid.UUID] = mapped_column(index=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(index=True)
     enrollment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("enrollments.uid"), index=True)
     resource: Mapped[str] = mapped_column(index=True)
     volume: Mapped[int] = mapped_column()
