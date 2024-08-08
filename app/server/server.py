@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 
 import fastapi
 import pydantic
+from apps.enrollments.routes import router as enrollments_router
+from apps.usages.routes import router as usages_router
 from core import exceptions
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -102,7 +104,8 @@ app.add_middleware(
 
 # from apps.note.routes import router as note_router
 
-# app.include_router(note_router, prefix="/note", tags=["note"])
+app.include_router(enrollments_router)
+app.include_router(usages_router)
 
 
 @app.get("/")
