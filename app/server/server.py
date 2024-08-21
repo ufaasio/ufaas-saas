@@ -10,8 +10,9 @@ from core import exceptions
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from json_advanced import dumps
-from server import config, db
 from usso.exceptions import USSOException
+
+from . import config, db
 
 
 @asynccontextmanager

@@ -1,7 +1,9 @@
 import uuid
 
 from core.exceptions import BaseHTTPException
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from server.db import AsyncSession, get_session
+from sqlalchemy import select
 
 from .models import Enrollments, Usages
 from .schemas import UsageSchema
@@ -12,7 +14,31 @@ router = APIRouter(prefix="/usages", tags=["Usage"])
 
 
 ##### get list of Usages #####
+
+
 @router.get("/", response_model=list[UsageSchema])
+async def get_filtered_usages(
+    business_id: uuid.UUID,
+    user_id=None,
+    resource=None,
+    volume=None,
+    on_item=None,
+    session: AsyncSession = Depends(get_session),
+):
+    stmt = select(Usages).filter_by(business_id=business_id)
+    if user_id:
+        stmt = stmt.filter_by(user_id=user_id)
+    if resource:
+        stmt = stmt.filter_by(resource=resource)
+    if volume:
+        stmt = stmt.filter_by(volume=volume)
+    if on_item:
+        stmt = stmt.filter_by(on_item=on_item)
+
+    result = await session.execute(stmt)
+    return result.scalars().all()
+
+
 async def get_usages(
     business_id: uuid.UUID,
     user_id: uuid.UUID | None = None,

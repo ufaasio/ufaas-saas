@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from apps.base.models import ImmutableBase
+from apps.base.models import ImmutableBusinessOwnedEntity
 from apps.enrollments.models import Enrollments
 from sqlalchemy import ForeignKey, event
 from sqlalchemy.future import select
@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 
 
 #### Start of Usages ####
-class Usages(ImmutableBase):
+class Usages(ImmutableBusinessOwnedEntity):
     """
     the Usages is an immutable table. using class ImmutableBusinessOwnedEntity.
     """
