@@ -104,47 +104,13 @@ class AbstractBaseRouter(Generic[T, TS], metaclass=singleton.Singleton):
         user = await self.get_user(request)
         limit = max(1, min(limit, Settings.page_max_limit))
 
-        # Create the base query
-        base_query = [
-            self.model.is_deleted == False,
+        items = [
+            self.schema(**item.__dict__)
+            for item in await self.model.list_items(
+                session, offset=offset, limit=limit, user_id=user.uid
+            )
         ]
-
-        # Apply user_id filtering if the model has a user_id attribute
-        if hasattr(self.model, "user_id"):
-            base_query.append(self.model.user_id == user.uid)
-
-        # Query for getting the total count of items
-        total_count_query = select(func.count()).filter(*base_query)  # .subquery()
-
-        # Create the base query for fetching the items
-        items_query = (
-            select(self.model)
-            .filter(*base_query)
-            .order_by(self.model.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-            # .subquery()
-        )
-
-        # Combine both queries into a single select statement
-        combined_query = select(
-            total_count_query.subquery().c[0].label("total"), items_query.subquery()
-        )
-
-        # Execute the combined query
-        # result = await session.execute(combined_query)
-        # res2 = result.fetchall()
-        # res = result.scalars().all()
-
-        total_result = await session.execute(total_count_query)
-        total = total_result.scalar()
-
-        # Extract total count and items
-
-        items_result = await session.execute(items_query)
-        rows = items_result.scalars().all()
-        items = [self.schema(**row.__dict__) for row in rows]
-
+        total = await self.model.total_count(session, user_id=user.uid)
         return PaginatedResponse(items=items, offset=offset, limit=limit, total=total)
 
     async def retrieve_item(
@@ -173,15 +139,7 @@ class AbstractBaseRouter(Generic[T, TS], metaclass=singleton.Singleton):
     ):
         user = await self.get_user(request)
         item_data = await create_dto(self.schema)(request, user)
-
-        # Create a new item instance from the model
-        item = self.model(**item_data.model_dump())
-
-        # Add the item to the session and commit the transaction
-        session.add(item)
-        await session.commit()
-        await session.refresh(item)
-
+        item = await self.model.create_item(session, item_data.model_dump())
         return self.create_response_schema(**item.__dict__)
 
     async def update_item(
@@ -202,12 +160,8 @@ class AbstractBaseRouter(Generic[T, TS], metaclass=singleton.Singleton):
                 message=f"{self.model.__name__.capitalize()} not found",
             )
 
-        item_data = await update_dto(self.model)(request, item, user)
-        session.add(item_data)
-        await session.commit()
-        await session.refresh(item_data)
-
-        return self.update_response_schema(**item_data.__dict__)
+        item = await self.model.update_item(session, item, data)
+        return self.update_response_schema(**item.__dict__)
 
     async def delete_item(
         self,
@@ -226,9 +180,5 @@ class AbstractBaseRouter(Generic[T, TS], metaclass=singleton.Singleton):
                 message=f"{self.model.__name__.capitalize()} not found",
             )
 
-        item.is_deleted = True
-        session.add(item)
-        await session.commit()
-        await session.refresh(item)
-
+        item = await self.model.delete_item(session, item)
         return self.delete_response_schema(**item.__dict__)

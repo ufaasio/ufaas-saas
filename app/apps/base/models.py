@@ -35,7 +35,7 @@ class BaseEntity:
         default=lambda: datetime.now(timezone.utc), onupdate=func.now()
     )
     is_deleted: Mapped[bool] = mapped_column(default=False)
-    meta_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    meta_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # name: Mapped[str | None] = mapped_column(nullable=True)
 
     @classmethod
@@ -45,22 +45,141 @@ class BaseEntity:
         uid: uuid.UUID,
         user_id: uuid.UUID = None,
         business_name: str = None,
+        is_deleted: bool = False,
     ):
-        query = select(cls).filter_by(uid=uid, is_deleted=False)
+        base_query = [cls.is_deleted == is_deleted, cls.uid == uid]
+
+        if hasattr(cls, "user_id"):
+            base_query.append(cls.user_id == user_id)
+        if hasattr(cls, "business_name"):
+            base_query.append(cls.business_name == business_name)
+
+        query = select(cls).filter(*base_query)
+        result = await session.execute(query)
+        item = result.scalar_one_or_none()
+        return item
+
+    @classmethod
+    async def list_items(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID = None,
+        business_name: str = None,
+        offset: int = 0,
+        limit: int = 10,
+        is_deleted: bool = False,
+    ):
+        base_query = [cls.is_deleted == is_deleted]
+
+        if hasattr(cls, "user_id"):
+            base_query.append(cls.user_id == user_id)
+        if hasattr(cls, "business_name"):
+            base_query.append(cls.business_name == business_name)
+
+        items_query = (
+            select(cls)
+            .filter(*base_query)
+            .order_by(cls.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+
+        items_result = await session.execute(items_query)
+        items = items_result.scalars().all()
+        return items
+
+    @classmethod
+    async def total_count(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID = None,
+        business_name: str = None,
+        is_deleted: bool = False,
+    ):
+        # Create the base query
+        base_query = [cls.is_deleted == is_deleted]
 
         # Apply user_id filtering if the model has a user_id attribute
         if hasattr(cls, "user_id"):
-            if user_id is None:
-                raise ValueError("User is required for this model")
-            query = query.filter_by(user_id=user_id)
+            base_query.append(cls.user_id == user_id)
         if hasattr(cls, "business_name"):
-            if business_name is None:
-                raise ValueError("Business name is required for this model")
-            query = query.filter_by(business_name=business_name)
+            base_query.append(cls.business_name == business_name)
 
-        # Execute the query
-        result = await session.execute(query)
-        item = result.scalar_one_or_none()
+        # Query for getting the total count of items
+        total_count_query = select(func.count()).filter(*base_query)  # .subquery()
+
+        total_result = await session.execute(total_count_query)
+        total = total_result.scalar()
+
+        return total
+
+    @classmethod
+    async def list_total_combined(
+        cls,
+        session: AsyncSession,
+        user_id: uuid.UUID = None,
+        business_name: str = None,
+        offset: int = 0,
+        limit: int = 10,
+        is_deleted: bool = False,
+    ):
+        base_query = [cls.is_deleted == is_deleted]
+
+        if hasattr(cls, "user_id"):
+            base_query.append(cls.user_id == user_id)
+        if hasattr(cls, "business_name"):
+            base_query.append(cls.business_name == business_name)
+
+        total_count_query = select(func.count()).filter(*base_query)  # .subquery()
+
+        # Create the base query for fetching the items
+        items_query = (
+            select(cls)
+            .filter(*base_query)
+            .order_by(cls.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            # .subquery()
+        )
+
+        # Combine both queries into a single select statement
+        combined_query = select(
+            total_count_query.subquery().c[0].label("total"), items_query.subquery()
+        )
+        # Execute the combined query
+        # result = await session.execute(combined_query)
+        # res2 = result.fetchall()
+        # res = result.scalars().all()
+
+    @classmethod
+    async def create_item(cls, session: AsyncSession, data: dict):
+        item = cls(**data)
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+        return item
+
+    @classmethod
+    async def update_item(cls, session: AsyncSession, item: "BaseEntity", data: dict):
+        # Todo: check data has valid and permitted keys
+        for key, value in data.items():
+            # if type(value) is dict:
+            #     current_value: dict = getattr(item, key)
+                
+            #     setattr(item, key, current_value | value)
+            # else:
+                setattr(item, key, value)
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
+        return item
+
+    @classmethod
+    async def delete_item(cls, session: AsyncSession, item: "BaseEntity"):
+        item.is_deleted = True
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
         return item
 
 
