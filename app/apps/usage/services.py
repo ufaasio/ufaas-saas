@@ -1,4 +1,3 @@
-import logging
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -114,7 +113,6 @@ async def get_active_enrollments(
 ) -> list[Enrollment]:
     now = datetime.now()
     user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
-    logging.info(f"{user_id=}")
     user_id = Binary.from_uuid(user_id, UUID_SUBTYPE)
     base_query = {
         "business_name": business_name,
@@ -227,13 +225,11 @@ async def select_enrollment(
         )
         if not using:
             continue
-        
+
         enrollment, using_quota, leftover_bundles = using
         residual -= using_quota
         selected_enrollments.append((enrollment, using_quota, leftover_bundles))
         if residual == 0:
             return selected_enrollments
-        
+
     return selected_enrollments
-        
-    

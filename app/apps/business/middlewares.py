@@ -67,7 +67,10 @@ async def authorization_middleware(request: Request) -> AuthorizationData:
         jwt_config=authorization.business.config.jwt_config
     ).jwt_access_security(request)
 
-    if authorization.user.data and authorization.user.data.get("authentication_method") == "app":
+    if (
+        authorization.user.data
+        and authorization.user.data.get("authentication_method") == "app"
+    ):
         authorization.auth_type = "App"
         authorization.user_id = authorization.user.data.get("app_id")
         authorization.app_id = authorization.user.data.get("app_id")

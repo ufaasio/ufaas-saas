@@ -22,6 +22,7 @@ class Settings(metaclass=Singleton):
     base_dir: Path = Path(__file__).resolve().parent.parent
     base_path: str = "/api/v1/apps/saas"
     page_max_limit: int = 100
+    coverage_dir: Path = base_dir / "htmlcov"
     currency: str = "IRR"
 
     app_id: str = os.getenv("APP_ID")

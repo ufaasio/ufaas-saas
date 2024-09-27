@@ -1,5 +1,7 @@
 import logging
 import os
+import uuid
+from datetime import datetime, timedelta
 from typing import AsyncGenerator
 
 import debugpy
@@ -91,7 +93,10 @@ async def access_token_user():
 
 @pytest_asyncio.fixture(scope="session")
 async def auth_headers_business(access_token_business):
-    return {"Authorization": f"Bearer {access_token_business}"}
+    return {
+        "Authorization": f"Bearer {access_token_business}",
+        "Content-Type": "application/json",
+    }
 
 
 @pytest.fixture(scope="module")
@@ -99,84 +104,91 @@ def constants():
     return StaticData()
 
 
-@pytest_asyncio.fixture(scope="module")
-async def enrollments(constants: StaticData):
-    import uuid
-    from datetime import datetime, timedelta
+@pytest.fixture(scope="module")
+def enrollment_dicts():
+    now = datetime.now()
 
+    enrollment_dicts = []
+    enrollment_dicts.append(
+        dict(
+            expired_at=now + timedelta(seconds=2),
+            bundles=[dict(asset="image", quota=10)],
+        )
+    )
+    enrollment_dicts.append(
+        dict(expired_at=None, bundles=[dict(asset="image", quota=10)])
+    )
+    enrollment_dicts.append(
+        dict(
+            expired_at=now + timedelta(seconds=11),
+            bundles=[dict(asset="image", quota=10)],
+            variant="variant",
+        )
+    )
+    enrollment_dicts.append(
+        dict(
+            expired_at=now + timedelta(seconds=1),
+            bundles=[dict(asset="image", quota=10), dict(asset="text", quota=10)],
+        )
+    )
+    enrollment_dicts.append(
+        dict(
+            expired_at=now + timedelta(seconds=100),
+            bundles=[dict(asset="text", quota=10)],
+        )
+    )
+    return enrollment_dicts
+
+
+@pytest_asyncio.fixture(scope="module")
+async def enrollments(constants: StaticData, enrollment_dicts):
     from apps.enrollment.models import Enrollment
 
     uid = lambda i: uuid.UUID(f"{i:032}")
 
     now = datetime.now()
-    enrollments = []
-    enrollments.append(await Enrollment(
-        uid=uid(1),
-        created_at=now - timedelta(seconds=2),
-        business_name=constants.business_name_1,
-        user_id=constants.user_id_1_1,
-        status="active",
-        price=0,
-        expired_at=now + timedelta(seconds=2),
-        bundles=[dict(asset="image", quota=10)],
-    ).save())
-    enrollments.append(await Enrollment(
-        uid=uid(2),
-        created_at=now - timedelta(seconds=2),
-        business_name=constants.business_name_1,
-        user_id=constants.user_id_1_1,
-        status="active",
-        price=0,
-        expired_at=None,
-        bundles=[dict(asset="image", quota=10)],
-    ).save())
-    enrollments.append(await Enrollment(
-        uid=uid(3),
-        created_at=now - timedelta(seconds=2),
-        business_name=constants.business_name_1,
-        user_id=constants.user_id_1_1,
-        status="active",
-        price=0,
-        expired_at=now + timedelta(seconds=11),
-        bundles=[dict(asset="image", quota=10)],
-        variant="variant",
-    ).save())
-    enrollments.append(await Enrollment(
-        uid=uid(4),
-        created_at=now - timedelta(seconds=2),
-        business_name=constants.business_name_1,
-        user_id=constants.user_id_1_1,
-        status="active",
-        price=0,
-        expired_at=now + timedelta(seconds=1),
-        bundles=[dict(asset="image", quota=10), dict(asset="text", quota=10)],
-    ).save())
-    enrollments.append(await Enrollment(
-        uid=uid(5),
-        created_at=now - timedelta(seconds=2),
-        business_name=constants.business_name_1,
-        user_id=constants.user_id_1_1,
-        status="active",
-        price=0,
-        expired_at=now + timedelta(seconds=10),
-        bundles=[dict(asset="text", quota=10)],
-    ).save())
 
+    try:
+        enrollments = []
+        for i, enrollment_dict in enumerate(enrollment_dicts):
+            enrollment = await Enrollment.get_item(
+                uid=uid(i + 1), business_name=constants.business_name_1, user_id=None
+            )
+            if enrollment:
+                await enrollment.delete()
+
+            enrollment = Enrollment(
+                uid=uid(i + 1),
+                created_at=now - timedelta(seconds=2),
+                business_name=constants.business_name_1,
+                user_id=constants.user_id_1_1,
+                status="active",
+                price=0,
+                **enrollment_dict,
+            )
+            await enrollment.save()
+            enrollments.append(enrollment)
+    except Exception as e:
+        logging.error(f"enrollments: {e}")
     yield enrollments
 
     for enrollment in enrollments:
         await enrollment.delete()
 
+
 @pytest_asyncio.fixture(scope="module")
 async def businesses(constants: StaticData):
     from apps.business.models import Business
+
     data = dict(
         name=StaticData.business_name_1,
         domain="test.ufaas.io",
         user_id=StaticData.user_id_1_1,
         uid=StaticData.business_id_1,
     )
-    bus = await Business(**data).save()
+    bus = await Business.get_by_origin(data["domain"])
+    if not bus:
+        bus = await Business(**data).save()
 
     yield bus
 

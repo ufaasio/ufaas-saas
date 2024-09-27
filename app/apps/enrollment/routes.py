@@ -89,8 +89,15 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         if auth.auth_type == "user":
             # TODO check scopes
             raise AuthorizationException("User cannot create enrollment")
-        item = await super().create_item(request, data.model_dump())
-        return self.create_response_schema(
+        data = data.model_dump()
+        data.pop("user_id", None)
+        item = self.model(
+            business_name=auth.business.name,
+            user_id=auth.user_id if auth.user_id else auth.user.uid,
+            **data,
+        )
+        await item.save()
+        return self.schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
