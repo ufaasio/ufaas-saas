@@ -1,14 +1,21 @@
-from fastapi import Request
+import uuid
 
+from fastapi import Query, Request
+from fastapi_mongo_base.schemas import PaginatedResponse
+
+from apps.business.middlewares import AuthorizationException
 from apps.business.routes import AbstractAuthRouter
+from server.config import Settings
 
 from .models import Enrollment
-from .schemas import EnrollmentCreateSchema, EnrollmentSchema
+from .schemas import EnrollmentCreateSchema, EnrollmentDetailSchema
 
 
-class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentSchema]):
+class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
     def __init__(self):
-        super().__init__(model=Enrollment, schema=EnrollmentSchema, user_dependency=None)
+        super().__init__(
+            model=Enrollment, schema=EnrollmentDetailSchema, user_dependency=None
+        )
 
     def config_routes(self):
         self.router.add_api_route(
@@ -47,9 +54,52 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentSchema]):
             # status_code=204,
         )
 
+    async def list_items(
+        self,
+        request: Request,
+        offset: int = Query(0, ge=0),
+        limit: int = Query(10, ge=0, le=Settings.page_max_limit),
+    ):
+        auth = await self.get_auth(request)
+        items, total = await self.model.list_total_combined(
+            user_id=auth.user_id,
+            business_name=auth.business.name,
+            offset=offset,
+            limit=limit,
+        )
+        items_in_schema = [
+            self.list_item_schema(
+                **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
+            )
+            for item in items
+        ]
+        return PaginatedResponse(
+            items=items_in_schema, offset=offset, limit=limit, total=total
+        )
+
+    async def retrieve_item(self, request: Request, uid: uuid.UUID):
+        item = await super().retrieve_item(request, uid)
+        return self.retrieve_response_schema(
+            **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
+        )
+
     async def create_item(self, request: Request, data: EnrollmentCreateSchema):
         # only business can create enrollment
-        return await super().create_item(request, data.model_dump())
+        auth = await self.get_auth(request)
+        if auth.auth_type == "user":
+            # TODO check scopes
+            raise AuthorizationException("User cannot create enrollment")
+        item = await super().create_item(request, data.model_dump())
+        return self.create_response_schema(
+            **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
+        )
+
+    async def delete_item(self, request: Request, uid: uuid.UUID):
+        raise NotImplementedError("Delete is not allowed")
+        item = await super().delete_item(request, uid)
+        return self.retrieve_response_schema(
+            **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
+        )
 
 
 router = EnrollmentRouter().router

@@ -14,9 +14,11 @@ class AuthorizationData(BaseModel):
     user: UserData | None = None
     user_id: uuid.UUID | None = None
     business: Business | None = None
-    business_or_user: Literal["Business", "User"] | None = None
+    auth_type: Literal["Business", "User", "App"] | None = None
     authorized: bool = False
     app_id: str | None = None
+
+    scopes: list[str] | None = None
 
 
 class AuthorizationException(BaseHTTPException):
@@ -39,7 +41,7 @@ async def authorized_request(request: Request) -> bool:
 
 async def business_or_user(
     request: Request,
-) -> tuple[Literal["Business", "User"], UserData]:
+) -> tuple[Literal["Business", "User", "App"], UserData]:
     business = await get_business(request)
     user = await Usso(jwt_config=business.config.jwt_config).jwt_access_security(
         request
@@ -65,15 +67,21 @@ async def authorization_middleware(request: Request) -> AuthorizationData:
         jwt_config=authorization.business.config.jwt_config
     ).jwt_access_security(request)
 
-    if authorization.business.user_id == authorization.user.uid:
-        authorization.business_or_user = "Business"
+    if authorization.user.data and authorization.user.data.get("authentication_method") == "app":
+        authorization.auth_type = "App"
+        authorization.user_id = authorization.user.data.get("app_id")
+        authorization.app_id = authorization.user.data.get("app_id")
+        authorization.scopes = authorization.user.data.get("scopes")
+
+    elif authorization.business.user_id == authorization.user.uid:
+        authorization.auth_type = "Business"
         authorization.user_id = (
             request.query_params.get("user_id")
             or request.path_params.get("user_id")
             or (await get_request_body_dict(request)).get("user_id")
         )
     else:
-        authorization.business_or_user = "User"
+        authorization.auth_type = "User"
         authorization.user_id = authorization.user.uid
 
     # authorization.app_id = request.headers.get("X-App-Id")
