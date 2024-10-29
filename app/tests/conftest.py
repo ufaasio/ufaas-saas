@@ -10,6 +10,7 @@ import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
+from ufaas_fastapi_business.models import Business
 
 from server.config import Settings
 from server.server import app as fastapi_app
@@ -75,31 +76,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
         yield ac
 
 
-@pytest_asyncio.fixture(scope="session")
-async def access_token_business():
-    data = {"refresh_token": StaticData.refresh_token}
-    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
-        response = await client.post("/auth/refresh", json=data)
-        return response.json()["access_token"]
-
-
-@pytest_asyncio.fixture(scope="session")
-async def access_token_user():
-    data = {"refresh_token": StaticData.refresh_token_user}
-    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
-        response = await client.post("/auth/refresh", json=data)
-        return response.json()["access_token"]
-
-
-@pytest_asyncio.fixture(scope="session")
-async def auth_headers_business(access_token_business):
-    return {
-        "Authorization": f"Bearer {access_token_business}",
-        "Content-Type": "application/json",
-    }
-
-
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def constants():
     return StaticData()
 
@@ -176,10 +153,8 @@ async def enrollments(constants: StaticData, enrollment_dicts):
         await enrollment.delete()
 
 
-@pytest_asyncio.fixture(scope="module")
-async def businesses(constants: StaticData):
-    from apps.business.models import Business
-
+@pytest_asyncio.fixture(scope="session")
+async def business(constants: StaticData):
     data = dict(
         name=StaticData.business_name_1,
         domain="test.ufaas.io",
@@ -187,9 +162,30 @@ async def businesses(constants: StaticData):
         uid=StaticData.business_id_1,
     )
     bus = await Business.get_by_origin(data["domain"])
-    if not bus:
-        bus = await Business(**data).save()
 
     yield bus
 
-    await bus.delete()
+
+@pytest_asyncio.fixture(scope="session")
+async def access_token_business(business: Business):
+    data = {"refresh_token": StaticData.refresh_token}
+
+    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
+        response = await client.post("/auth/refresh", json=data)
+        return response.json()["access_token"]
+
+
+@pytest_asyncio.fixture(scope="session")
+async def access_token_user(business: Business):
+    data = {"refresh_token": StaticData.refresh_token_user}
+    async with httpx.AsyncClient(base_url="https://sso.ufaas.io") as client:
+        response = await client.post("/auth/refresh", json=data)
+        return response.json()["access_token"]
+
+
+@pytest_asyncio.fixture(scope="session")
+async def auth_headers_business(access_token_business):
+    return {
+        "Authorization": f"Bearer {access_token_business}",
+        "Content-Type": "application/json",
+    }

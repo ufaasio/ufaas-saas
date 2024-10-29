@@ -11,7 +11,8 @@ ipython
 aiohttp
 aiofiles
 aiocache
-usso
+usso[fastapi]
 
 beanie
 fastapi-mongo-base
+ufaas-fastapi-business

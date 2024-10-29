@@ -20,7 +20,7 @@ async def test_usage_create(
     client: httpx.AsyncClient,
     auth_headers_business,
     enrollments,
-    businesses,
+    business,
     constants: StaticData,
 ):
     try:
@@ -44,7 +44,7 @@ async def test_usage_list(
     client: httpx.AsyncClient,
     auth_headers_business,
     enrollments,
-    businesses,
+    business,
     constants: StaticData,
 ):
     response = await client.get(usage_endpoint, headers=auth_headers_business)

@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Literal
 
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from utils.numtools import decimal_amount
 
@@ -13,6 +13,9 @@ from utils.numtools import decimal_amount
 class Bundle(BaseModel):
     asset: str
     quota: Decimal
+    unit: str | None = None
+
+    model_config = ConfigDict(allow_inf_nan=True)
 
     @field_validator("quota", mode="before")
     def validate_quota(cls, value):

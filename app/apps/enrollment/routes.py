@@ -2,9 +2,9 @@ import uuid
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from ufaas_fastapi_business.middlewares import AuthorizationException
+from ufaas_fastapi_business.routes import AbstractAuthRouter
 
-from apps.business.middlewares import AuthorizationException
-from apps.business.routes import AbstractAuthRouter
 from server.config import Settings
 
 from .models import Enrollment
@@ -62,7 +62,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
     ):
         auth = await self.get_auth(request)
         items, total = await self.model.list_total_combined(
-            user_id=auth.user_id,
+            user_id=None,
             business_name=auth.business.name,
             offset=offset,
             limit=limit,
@@ -78,7 +78,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         )
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
-        item = await super().retrieve_item(request, uid)
+        auth = await self.get_auth(request)
+        item = await self.get_item(uid, user_id=None, business_name=auth.business.name)
         return self.retrieve_response_schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
@@ -86,10 +87,10 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
     async def create_item(self, request: Request, data: EnrollmentCreateSchema):
         # only business can create enrollment
         auth = await self.get_auth(request)
-        if auth.auth_type == "user":
+        if auth.issuer_type == "User":
             # TODO check scopes
             raise AuthorizationException("User cannot create enrollment")
-        data = data.model_dump()
+        data: dict = data.model_dump()
         data.pop("user_id", None)
         item = self.model(
             business_name=auth.business.name,

@@ -1,7 +1,6 @@
 from fastapi import Request
-
-from apps.business.middlewares import AuthorizationException
-from apps.business.routes import AbstractAuthRouter
+from ufaas_fastapi_business.middlewares import AuthorizationException
+from ufaas_fastapi_business.routes import AbstractAuthRouter
 
 from .models import Usage
 from .schemas import UsageCreateSchema, UsageSchema
@@ -43,7 +42,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
         # only business can create usage
         auth = await self.get_auth(request)
 
-        if auth.auth_type == "user":
+        if auth.issuer_type == "User":
             # TODO check scopes
             raise AuthorizationException("User cannot create enrollment")
 

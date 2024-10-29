@@ -7,7 +7,7 @@ dotenv.load_dotenv()
 
 
 class StaticData(metaclass=Singleton):
-    business_name_1 = "business_1"
+    business_name_1 = "ufaas test"
     business_id_1 = "00000000-0000-0000-0001-000000000000"
     business_domain_1 = "test.ufaas.io"
 

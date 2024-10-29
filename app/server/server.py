@@ -38,8 +38,9 @@ app = fastapi.FastAPI(
         "name": "MIT License",
         "url": "https://github.com/mahdikiani/FastAPILaunchpad/blob/main/LICENSE",
     },
-    docs_url=f"{config.Settings.base_path}/docs",
     openapi_url=f"{config.Settings.base_path}/openapi.json",
+    docs_url=f"{config.Settings.base_path}/docs",
+    redoc_url=f"{config.Settings.base_path}/redoc",
     lifespan=lifespan,
 )
 
@@ -107,13 +108,9 @@ app.add_middleware(
 app.add_middleware(middlewares.OriginalHostMiddleware)
 
 
-from apps.business.routes import router as business_router
 from apps.enrollment.routes import router as enrollment_router
 from apps.usage.routes import router as usage_router
 
-app.include_router(
-    business_router, prefix=f"{config.Settings.base_path}", include_in_schema=False
-)
 app.include_router(enrollment_router, prefix=f"{config.Settings.base_path}")
 app.include_router(usage_router, prefix=f"{config.Settings.base_path}")
 
@@ -122,6 +119,7 @@ from fastapi.staticfiles import StaticFiles
 app.mount(
     "/coverage", StaticFiles(directory=config.Settings.coverage_dir), name="coverage"
 )
+
 
 @app.get(f"{config.Settings.base_path}/health")
 async def health(request: fastapi.Request):
