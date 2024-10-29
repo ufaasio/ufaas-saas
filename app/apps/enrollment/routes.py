@@ -2,10 +2,9 @@ import uuid
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
-
-from server.config import Settings
 
 from .models import Enrollment
 from .schemas import EnrollmentCreateSchema, EnrollmentDetailSchema
@@ -62,7 +61,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
     ):
         auth = await self.get_auth(request)
         items, total = await self.model.list_total_combined(
-            user_id=None,
+            user_id=auth.user_id,
             business_name=auth.business.name,
             offset=offset,
             limit=limit,
@@ -78,8 +77,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         )
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
-        auth = await self.get_auth(request)
-        item = await self.get_item(uid, user_id=None, business_name=auth.business.name)
+        item = await super().retrieve_item(request, uid)
         return self.retrieve_response_schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
