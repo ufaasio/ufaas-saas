@@ -7,6 +7,10 @@ from .schemas import UsageSchema
 
 
 class Usage(UsageSchema, BusinessOwnedEntity):
+
+    class Settings:
+        indexes = BusinessOwnedEntity.Settings.indexes
+
     @classmethod
     async def get_latest_usage(cls, enrollment_id: uuid.UUID) -> "Usage":
         # Fetch the latest usage for the given enrollment_id, sorted by the creation time in descending order

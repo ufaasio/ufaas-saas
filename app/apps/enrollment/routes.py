@@ -2,9 +2,10 @@ import uuid
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
-from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
+
+from server.config import Settings
 
 from .models import Enrollment
 from .schemas import EnrollmentCreateSchema, EnrollmentDetailSchema
@@ -45,26 +46,48 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         #     response_model=self.update_response_schema,
         #     status_code=200,
         # )
-        self.router.add_api_route(
-            "/{uid:uuid}",
-            self.delete_item,
-            methods=["DELETE"],
-            response_model=self.delete_response_schema,
-            # status_code=204,
-        )
+        # self.router.add_api_route(
+        #     "/{uid:uuid}",
+        #     self.delete_item,
+        #     methods=["DELETE"],
+        #     response_model=self.delete_response_schema,
+        #     # status_code=204,
+        # )
 
     async def list_items(
         self,
         request: Request,
         offset: int = Query(0, ge=0),
         limit: int = Query(10, ge=0, le=Settings.page_max_limit),
+        user_id: uuid.UUID = None,
+        asset: str = None,
+        variant: str = None,
+        is_valid: bool = True,
     ):
+        """
+        Retrieve a list of enrollments with pagination.
+
+        Args:
+
+            offset (int, optional): The offset value for pagination. Defaults to 0.
+            limit (int, optional): The maximum number of items to retrieve. Defaults to 10.
+
+        Returns:
+
+            PaginatedResponse: The paginated response containing the items, offset, limit, and total count.
+        """
         auth = await self.get_auth(request)
+        if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
+            raise AuthorizationException("User cannot list other user's enrollment")
+
         items, total = await self.model.list_total_combined(
             user_id=auth.user_id,
             business_name=auth.business.name,
             offset=offset,
             limit=limit,
+            asset=asset,
+            variant=variant,
+            is_valid=is_valid,
         )
         items_in_schema = [
             self.list_item_schema(
@@ -77,12 +100,50 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         )
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
-        item = await super().retrieve_item(request, uid)
+        """
+        Retrieve an enrollment with the given UID.
+
+        Args:
+
+            uid (uuid.UUID): The UID of the item to retrieve.
+
+        Returns:
+
+            Enrolment: The retrieved enrollment with the leftover bundles.
+        """
+        item: Enrollment = await super().retrieve_item(request, uid)
         return self.retrieve_response_schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
     async def create_item(self, request: Request, data: EnrollmentCreateSchema):
+        """
+
+        Create an enrollment item.
+
+        Args:
+
+            - user_id: uuid.UUID, owner of the enrollment
+            - price: Decimal, price of the enrollment
+            - invoice_id: str | None, invoice id of the enrollment if any
+            - start_at: datetime, start date of the enrollment, default set now if not provided
+            - expire_at: datetime | None, expiration date of the enrollment for the selected bundles, default None
+            - status: "active" | "expired", the status of the enrollment, default "active"
+            - bundles: list[Bundle], list of bundles that are included in the enrollment. Each bundle should have a asset, quota, and unit.
+                asset: str, the asset name (For example, "Storage" in storage service, "Tokens" in LLM API service, ...)
+                quota: Decimal, the quota of the asset
+                unit: str | None, the unit of the quota (For example, "GB" in storage service, "Tokens" in LLM API service, ...) if any
+            - variant: str | None, the variant limitation of the enrollment. For example, "car" category in a classified advertisements service. For normal enrollment, it would be None and it is not to be provided.
+            - meta_data: dict | None = None, additional metadata for the enrollment that will be stored as a dictionary.
+
+        Returns:
+
+            dict: The created enrollment item.
+
+        Raises:
+
+            - AuthorizationException: If the user is not authorized to create an enrollment.
+        """
         # only business can create enrollment
         auth = await self.get_auth(request)
         if auth.issuer_type == "User":

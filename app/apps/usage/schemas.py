@@ -23,8 +23,15 @@ class UsageSchema(BusinessOwnedEntitySchema):
 
 
 class UsageCreateSchema(BaseModel):
+    user_id: uuid.UUID | None = None
     enrollment_id: uuid.UUID | None = None
     asset: str
     amount: Decimal = Decimal(1)
     variant: str | None = None
     meta_data: dict | None = None
+
+    # @model_validator(mode="after")
+    # def validate_enrollment_id(cls, item: "UsageCreateSchema"):
+    #     if not item.user_id and not item.enrollment_id:
+    #         raise ValueError("Either user_id or enrollment_id must be provided")
+    #     return item

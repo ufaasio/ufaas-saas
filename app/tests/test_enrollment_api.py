@@ -68,7 +68,7 @@ async def test_usage_list(
 async def test_enrollment_endpoint_list(
     client: httpx.AsyncClient, auth_headers_business, enrollments
 ):
-    response = await client.get(enrollment_endpoint, headers=auth_headers_business)
+    response = await client.get(enrollment_endpoint, headers=auth_headers_business, params={"is_valid": False})
     resp_json = response.json()
     logging.info(f"enrollment_list: {client.base_url} {resp_json}")
     assert response.status_code == 200

@@ -138,7 +138,7 @@ async def enrollments(constants: StaticData, enrollment_dicts):
                 uid=uid(i + 1),
                 created_at=now - timedelta(seconds=2),
                 business_name=constants.business_name_1,
-                user_id=constants.user_id_1_1,
+                user_id=uuid.UUID(constants.user_id_1_1),
                 status="active",
                 price=0,
                 **enrollment_dict,
@@ -146,7 +146,11 @@ async def enrollments(constants: StaticData, enrollment_dicts):
             await enrollment.save()
             enrollments.append(enrollment)
     except Exception as e:
-        logging.error(f"enrollments: {e}")
+        import traceback
+
+        traceback_str = "".join(traceback.format_tb(e.__traceback__))
+
+        logging.error(f"create base enrollments: \n{traceback_str}\n{e}")
     yield enrollments
 
     for enrollment in enrollments:

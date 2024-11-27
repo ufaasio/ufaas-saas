@@ -123,27 +123,17 @@ app.mount(
 
 @app.get(f"{config.Settings.base_path}/health")
 async def health(request: fastapi.Request):
-    original_host = request.headers.get("x-original-host", "!not found!")
-    forwarded_host = request.headers.get("X-Forwarded-Host", "forwarded_host")
-    forwarded_proto = request.headers.get("X-Forwarded-Proto", "forwarded_proto")
-    forwarded_for = request.headers.get("X-Forwarded-For", "forwarded_for")
+    request.headers.get("x-original-host", "!not found!")
+    request.headers.get("X-Forwarded-Host", "forwarded_host")
+    request.headers.get("X-Forwarded-Proto", "forwarded_proto")
+    request.headers.get("X-Forwarded-For", "forwarded_for")
 
     return {
         "status": "up",
-        "host": request.url.hostname,
-        "host2": request.base_url.hostname,
-        "original_host": original_host,
-        "forwarded_host": forwarded_host,
-        "forwarded_proto": forwarded_proto,
-        "forwarded_for": forwarded_for,
+        # "host": request.url.hostname,
+        # "host2": request.base_url.hostname,
+        # "original_host": original_host,
+        # "forwarded_host": forwarded_host,
+        # "forwarded_proto": forwarded_proto,
+        # "forwarded_for": forwarded_for,
     }
-
-
-@app.get("/openapi.json", include_in_schema=False)
-async def openapi():
-    openapi = app.openapi()
-    paths = {}
-    for path in openapi["paths"]:
-        paths[f"{config.Settings.base_path}{path}"] = openapi["paths"][path]
-    openapi["paths"] = paths
-    return openapi
