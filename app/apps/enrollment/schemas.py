@@ -65,6 +65,7 @@ class EnrollmentCreateSchema(BaseModel):
     start_at: datetime = Field(default_factory=datetime.now)
     expire_at: datetime | None = None
     status: Literal["active", "expired"] = "active"
+    acquisition_type: AcquisitionType = AcquisitionType.purchase
 
     bundles: list[Bundle] = []
     variant: str | None = None

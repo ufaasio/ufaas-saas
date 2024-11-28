@@ -17,43 +17,6 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             model=Enrollment, schema=EnrollmentDetailSchema, user_dependency=None
         )
 
-    def config_routes(self):
-        self.router.add_api_route(
-            "/",
-            self.list_items,
-            methods=["GET"],
-            response_model=self.list_response_schema,
-            status_code=200,
-        )
-        self.router.add_api_route(
-            "/{uid:uuid}",
-            self.retrieve_item,
-            methods=["GET"],
-            response_model=self.retrieve_response_schema,
-            status_code=200,
-        )
-        self.router.add_api_route(
-            "/",
-            self.create_item,
-            methods=["POST"],
-            response_model=self.create_response_schema,
-            status_code=201,
-        )
-        # self.router.add_api_route(
-        #     "/{uid:uuid}",
-        #     self.update_item,
-        #     methods=["PATCH"],
-        #     response_model=self.update_response_schema,
-        #     status_code=200,
-        # )
-        # self.router.add_api_route(
-        #     "/{uid:uuid}",
-        #     self.delete_item,
-        #     methods=["DELETE"],
-        #     response_model=self.delete_response_schema,
-        #     # status_code=204,
-        # )
-
     async def list_items(
         self,
         request: Request,
@@ -160,13 +123,12 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         return self.schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
+    
+    async def update_item(self, request: Request, uid: uuid.UUID, data: EnrollmentCreateSchema):
+        raise NotImplementedError("Update is not allowed")
 
     async def delete_item(self, request: Request, uid: uuid.UUID):
         raise NotImplementedError("Delete is not allowed")
-        item = await super().delete_item(request, uid)
-        return self.retrieve_response_schema(
-            **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
-        )
 
 
 router = EnrollmentRouter().router

@@ -31,12 +31,12 @@ app = fastapi.FastAPI(
     version="0.1.0",
     contact={
         "name": "Mahdi Kiani",
-        "url": "https://github.com/mahdikiani/FastAPILaunchpad",
+        "url": "https://github.com/ufaasio/ufaas-saas",
         "email": "mahdikiany@gmail.com",
     },
     license_info={
         "name": "MIT License",
-        "url": "https://github.com/mahdikiani/FastAPILaunchpad/blob/main/LICENSE",
+        "url": "https://github.com/ufaasio/ufaas-saas/blob/main/LICENSE",
     },
     openapi_url=f"{config.Settings.base_path}/openapi.json",
     docs_url=f"{config.Settings.base_path}/docs",
