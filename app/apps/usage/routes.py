@@ -139,6 +139,8 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             # TODO check scopes
             raise AuthorizationException("User cannot create enrollment")
 
+        # logging.info(f'Creating usage {auth.issuer_type}, {auth.business.name}, {auth.user_id}, {data}')
+
         enrollment_quotas = await select_enrollment(
             business_name=auth.business.name,
             user_id=auth.user_id,
@@ -147,6 +149,9 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             variant=data.variant,
             enrollment_id=data.enrollment_id,
         )
+
+        # logging.info(f'Enrollment quotas {enrollment_quotas}')
+
         res: list[Usage] = []
         for enrollment, quota, leftover_bundles in enrollment_quotas:
             # create usage

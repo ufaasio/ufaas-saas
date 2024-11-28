@@ -1,4 +1,3 @@
-import logging
 import uuid
 
 from fastapi import Query, Request
@@ -55,10 +54,10 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
             raise AuthorizationException("User cannot list other user's enrollment")
 
-        logging.info(
-            f"List items: {auth.user_id}, {auth.business.name}, "
-            f"{auth.issuer_type}, {is_valid}, {asset}, {variant}, {is_valid}"
-        )
+        # logging.info(
+        #     f"List items: {auth.user_id}, {auth.business.name}, "
+        #     f"{auth.issuer_type}, {is_valid}, {asset}, {variant}, {is_valid}"
+        # )
 
         items, total = await self.model.list_total_combined(
             user_id=auth.user_id,
@@ -75,6 +74,11 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             )
             for item in items
         ]
+
+        # logging.info(
+        #     f"List items: {len(items_in_schema)}, {offset}, {limit}, {total}"
+        # )
+
         return PaginatedResponse(
             items=items_in_schema, offset=offset, limit=limit, total=total
         )
