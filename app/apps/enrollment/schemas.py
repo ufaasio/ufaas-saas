@@ -6,7 +6,6 @@ from typing import Literal
 
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 from utils.numtools import decimal_amount
 
 
@@ -60,16 +59,30 @@ class EnrollmentDetailSchema(EnrollmentSchema):
 
 class EnrollmentCreateSchema(BaseModel):
     user_id: uuid.UUID
-    price: Decimal
+    bundles: list[Bundle]
+
+    price: Decimal = Decimal(0)
     invoice_id: str | None = None
     start_at: datetime = Field(default_factory=datetime.now)
     expire_at: datetime | None = None
     status: Literal["active", "expired"] = "active"
     acquisition_type: AcquisitionType = AcquisitionType.purchase
 
-    bundles: list[Bundle] = []
     variant: str | None = None
     meta_data: dict | None = None
+
+
+class EnrollmentUpdateSchema(BaseModel):
+    price: Decimal = Decimal(0)
+    invoice_id: str | None = None
+    # start_at: datetime = Field(default_factory=datetime.now)
+    # expire_at: datetime | None = None
+    status: Literal["active", "expired"] = "active"
+    acquisition_type: AcquisitionType = AcquisitionType.purchase
+    meta_data: dict | None = None
+
+    due_date: datetime | None = None
+    is_paid: bool = False
 
 
 class FreemiumQuota(BaseModel):

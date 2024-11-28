@@ -1,8 +1,9 @@
 import uuid
-
-from pymongo import ASCENDING, DESCENDING
+from datetime import datetime
 
 from apps.enrollment.models import Enrollment
+from bson import UUID_SUBTYPE, Binary
+from pymongo import ASCENDING, DESCENDING
 
 
 async def get_active_enrollments(
@@ -12,13 +13,58 @@ async def get_active_enrollments(
     variant: str = None,
     enrollment_id: uuid.UUID = None,
 ) -> list[Enrollment]:
-    base_query = Enrollment.get_active_enrollments_base_query(
-        business_name=business_name,
-        user_id=user_id,
-        asset=asset,
-        variant=variant,
-        enrollment_id=enrollment_id,
-    )
+    # base_query = Enrollment.get_active_enrollments_base_query(
+    #     business_name=business_name,
+    #     user_id=user_id,
+    #     asset=asset,
+    #     variant=variant,
+    #     enrollment_id=enrollment_id,
+    # )
+    now = datetime.now()
+
+    base_query = {
+        "business_name": business_name,
+        "is_deleted": False,
+        "started_at": {"$lt": now},
+        "status": "active",
+        "$and": [
+            {
+                "$or": [
+                    {
+                        "acquisition_type": "purchase",
+                    },
+                    {
+                        "acquisition_type": "borrowed",
+                        "due_date": {"$gt": now},
+                        "is_paid": False,
+                    },
+                ]
+            },
+            {
+                "$or": [
+                    {"expired_at": {"$gt": now}},  # expire_at after now
+                    {"expired_at": None},  # or expire_at is None
+                ]
+            },
+            {
+                "$or": [
+                    {"variant": None},  # variant is None
+                    {"variant": variant},  # or variant matches given variant
+                ]
+            },
+        ],
+    }
+    if enrollment_id:
+        base_query["uid"] = enrollment_id
+
+    if user_id:
+        user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        user_id = Binary.from_uuid(user_id, UUID_SUBTYPE)
+        base_query["user_id"] = user_id
+
+    if asset:
+        base_query["bundles.asset"] = asset
+
     pipeline = [
         {"$match": base_query},
         {

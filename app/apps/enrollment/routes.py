@@ -1,14 +1,19 @@
+import logging
 import uuid
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
-from server.config import Settings
-
 from .models import Enrollment
-from .schemas import EnrollmentCreateSchema, EnrollmentDetailSchema
+from .schemas import (
+    EnrollmentCreateSchema,
+    EnrollmentDetailSchema,
+    EnrollmentSchema,
+    EnrollmentUpdateSchema,
+)
 
 
 class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
@@ -16,6 +21,13 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         super().__init__(
             model=Enrollment, schema=EnrollmentDetailSchema, user_dependency=None
         )
+
+    def config_schemas(self, schema, **kwargs):
+        super().config_schemas(schema, **kwargs)
+        self.delete_response_schema = EnrollmentSchema
+
+    def config_routes(self, **kwargs):
+        super().config_routes(**kwargs)
 
     async def list_items(
         self,
@@ -42,6 +54,11 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         auth = await self.get_auth(request)
         if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
             raise AuthorizationException("User cannot list other user's enrollment")
+
+        logging.info(
+            f"List items: {auth.user_id}, {auth.business.name}, "
+            f"{auth.issuer_type}, {is_valid}, {asset}, {variant}, {is_valid}"
+        )
 
         items, total = await self.model.list_total_combined(
             user_id=auth.user_id,
@@ -123,12 +140,19 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         return self.schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
-    
-    async def update_item(self, request: Request, uid: uuid.UUID, data: EnrollmentCreateSchema):
-        raise NotImplementedError("Update is not allowed")
+
+    async def update_item(
+        self, request: Request, uid: uuid.UUID, data: EnrollmentUpdateSchema
+    ):
+        item: Enrollment = await super().update_item(
+            request, uid, data.model_dump(exclude_unset=True)
+        )
+        return self.retrieve_response_schema(
+            **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
+        )
 
     async def delete_item(self, request: Request, uid: uuid.UUID):
-        raise NotImplementedError("Delete is not allowed")
+        return await super().delete_item(request, uid)
 
 
 router = EnrollmentRouter().router

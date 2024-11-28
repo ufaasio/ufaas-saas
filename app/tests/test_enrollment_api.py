@@ -5,7 +5,6 @@ import uuid
 import httpx
 import json_advanced as json
 import pytest
-
 from tests.constants import StaticData
 
 uid = lambda i: uuid.UUID(f"{i:032}")
@@ -68,7 +67,9 @@ async def test_usage_list(
 async def test_enrollment_endpoint_list(
     client: httpx.AsyncClient, auth_headers_business, enrollments
 ):
-    response = await client.get(enrollment_endpoint, headers=auth_headers_business, params={"is_valid": False})
+    response = await client.get(
+        enrollment_endpoint, headers=auth_headers_business, params={"is_valid": False}
+    )
     resp_json = response.json()
     logging.info(f"enrollment_list: {client.base_url} {resp_json}")
     assert response.status_code == 200

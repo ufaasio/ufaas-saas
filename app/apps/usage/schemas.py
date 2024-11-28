@@ -1,10 +1,9 @@
 import uuid
 from decimal import Decimal
 
+from apps.enrollment.schemas import Bundle
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, field_validator
-
-from apps.enrollment.schemas import Bundle
 from utils.numtools import decimal_amount
 
 

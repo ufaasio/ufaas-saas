@@ -96,14 +96,13 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
                         {"expired_at": None},  # or expire_at is None
                     ]
                 },
-                {
-                    "$or": [
-                        {"variant": None},  # variant is None
-                        {"variant": variant},  # or variant matches given variant
-                    ]
-                },
+                # {
+                #     "$or": [
+                #         {"variant": None},  # variant is None
+                #         {"variant": variant},  # or variant matches given variant
+                #     ]
+                # },
             ],
-            "bundles.asset": asset,
         }
         if enrollment_id:
             base_query["uid"] = enrollment_id
@@ -112,5 +111,8 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
             user_id = Binary.from_uuid(user_id, UUID_SUBTYPE)
             base_query["user_id"] = user_id
+
+        if asset:
+            base_query["bundles.asset"] = asset
 
         return base_query
