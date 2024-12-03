@@ -1,11 +1,14 @@
 import uuid
+from datetime import datetime
 
 from fastapi import Request
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
+from core.exceptions import BaseHTTPException
+
 from .models import Usage
-from .schemas import UsageCreateSchema, UsageSchema
+from .schemas import UsageCreateSchema, UsagePart, UsageSchema
 from .services import select_enrollment
 
 
@@ -43,7 +46,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             None
         """
         super().config_schemas(schema)
-        self.create_response_schema = list[self.schema]
+        # self.create_response_schema = list[self.schema]
 
     def config_routes(self):
         """
@@ -73,8 +76,24 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             response_model=self.create_response_schema,
             status_code=201,
         )
+        self.router.add_api_route(
+            "/{uid:uuid}/cancel",
+            self.cancel_item,
+            methods=["POST"],
+            response_model=self.retrieve_response_schema,
+        )
 
-    async def list_items(self, request: Request, offset: int = 0, limit: int = 10):
+    async def list_items(
+        self,
+        request: Request,
+        offset: int = 0,
+        limit: int = 10,
+        user_id: uuid.UUID = None,
+        asset: str = None,
+        variant: str = None,
+        created_at_from: datetime = None,
+        created_at_to: datetime = None,
+    ):
         """
         List usages with pagination.
 
@@ -87,6 +106,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
             The list of usages.
         """
+        # TODO: Implement the list_items method
         return await super().list_items(request, offset, limit)
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
@@ -129,7 +149,6 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             list[dict]: The list of created usage items. Each related to an enrollment.
 
         Raises:
-
             AuthorizationException: If the user is not authorized to create an enrollment.
         """
         # only business can create usage
@@ -150,24 +169,47 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             enrollment_id=data.enrollment_id,
         )
 
+        if len(enrollment_quotas) == 0:
+            raise BaseHTTPException(
+                status_code=402, detail="No enrollment is available for the usage"
+            )
+
         # logging.info(f'Enrollment quotas {enrollment_quotas}')
 
-        res: list[Usage] = []
+        parts: list[Usage] = []
         for enrollment, quota, leftover_bundles in enrollment_quotas:
             # create usage
-            item = Usage(
-                business_name=auth.business.name,
-                user_id=auth.user_id,
-                asset=data.asset,
-                amount=quota,
-                variant=data.variant,
+            part = UsagePart(
                 enrollment_id=enrollment.uid,
-                meta_data=data.meta_data,
+                amount=quota,
                 leftover_bundles=leftover_bundles,
             )
-            await item.save()
-            res.append(item)
-        return [UsageSchema(**item.model_dump()) for item in res]
+            parts.append(part)
+
+        item = Usage(
+            business_name=auth.business.name,
+            user_id=auth.user_id,
+            asset=data.asset,
+            amount=quota,
+            variant=data.variant,
+            meta_data=data.meta_data,
+            parts=parts,
+        )
+        await item.save()
+        return item
+
+    async def cancel_item(self, request: Request, uid: uuid.UUID):
+        """
+        Cancel a usage item.
+
+        Args:
+
+            uid (uuid.UUID): The uid of the usage.
+
+        Returns:
+
+            The canceled usage.
+        """
 
 
 router = UsageRouter().router

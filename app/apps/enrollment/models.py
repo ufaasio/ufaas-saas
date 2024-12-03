@@ -69,50 +69,56 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         variant: str = None,
         enrollment_id: uuid.UUID = None,
         is_deleted: bool = False,
-    ) -> dict:
+    ) -> list[dict]:
         now = datetime.now()
 
-        base_query = {
-            "business_name": business_name,
-            "is_deleted": is_deleted,
-            "started_at": {"$lt": now},
-            "status": "active",
-            "$and": [
-                {
-                    "$or": [
-                        {
-                            "acquisition_type": "purchase",
+        base_query = [
+            {"business_name": business_name},
+            {"is_deleted": is_deleted},
+            {"started_at": {"$lt": now}},
+            {"status": "active"},
+            {
+                "$or": [
+                    {
+                        "acquisition_type": {
+                            "$in": [
+                                "purchased",
+                                "promotion",
+                                "postpaid",
+                                "trial",
+                                "gifted",
+                            ]
                         },
-                        {
-                            "acquisition_type": "borrowed",
-                            "due_date": {"$gt": now},
-                            "is_paid": False,
-                        },
-                    ]
-                },
-                {
-                    "$or": [
-                        {"expired_at": {"$gt": now}},  # expire_at after now
-                        {"expired_at": None},  # or expire_at is None
-                    ]
-                },
-                # {
-                #     "$or": [
-                #         {"variant": None},  # variant is None
-                #         {"variant": variant},  # or variant matches given variant
-                #     ]
-                # },
-            ],
-        }
+                    },
+                    {
+                        "acquisition_type": "borrowed",
+                        "due_date": {"$gt": now},
+                        "is_paid": False,
+                    },
+                ]
+            },
+            {
+                "$or": [
+                    {"expired_at": {"$gt": now}},  # expire_at after now
+                    {"expired_at": None},  # or expire_at is None
+                ]
+            },
+            # {
+            #     "$or": [
+            #         {"variant": None},  # variant is None
+            #         {"variant": variant},  # or variant matches given variant
+            #     ]
+            # },
+        ]
         if enrollment_id:
-            base_query["uid"] = enrollment_id
+            base_query.append({"uid": enrollment_id})
 
         if user_id:
             user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
             user_id = Binary.from_uuid(user_id, UUID_SUBTYPE)
-            base_query["user_id"] = user_id
+            base_query.append({"user_id": user_id})
 
         if asset:
-            base_query["bundles.asset"] = asset
+            base_query.append({"bundles.asset": asset})
 
         return base_query

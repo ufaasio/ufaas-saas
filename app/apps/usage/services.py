@@ -148,4 +148,6 @@ async def select_enrollment(
         if residual == 0:
             return selected_enrollments
 
+    # create borrow enrollment
+
     return selected_enrollments

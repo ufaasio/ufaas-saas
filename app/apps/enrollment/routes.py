@@ -2,9 +2,10 @@ import uuid
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
-from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
+
+from server.config import Settings
 
 from .models import Enrollment
 from .schemas import (
@@ -112,6 +113,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             - invoice_id: str | None, invoice id of the enrollment if any
             - start_at: datetime, start date of the enrollment, default set now if not provided
             - expire_at: datetime | None, expiration date of the enrollment for the selected bundles, default None
+            - duration: int | None, duration of the enrollment in days, default None
             - status: "active" | "expired", the status of the enrollment, default "active"
             - bundles: list[Bundle], list of bundles that are included in the enrollment. Each bundle should have a asset, quota, and unit.
                 asset: str, the asset name (For example, "Storage" in storage service, "Tokens" in LLM API service, ...)
@@ -133,8 +135,10 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         if auth.issuer_type == "User":
             # TODO check scopes
             raise AuthorizationException("User cannot create enrollment")
+
         data: dict = data.model_dump()
         data.pop("user_id", None)
+
         item = self.model(
             business_name=auth.business.name,
             user_id=auth.user_id if auth.user_id else auth.user.uid,
