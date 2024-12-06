@@ -1,10 +1,9 @@
 import uuid
 from decimal import Decimal
 
+from apps.enrollment.schemas import Bundle
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, field_validator, model_validator
-
-from apps.enrollment.schemas import Bundle
 from utils.numtools import decimal_amount
 
 
@@ -52,3 +51,9 @@ class UsageCreateSchema(BaseModel):
         if not item.user_id and not item.enrollment_id:
             raise ValueError("Either user_id or enrollment_id must be provided")
         return item
+
+    @field_validator("amount", mode="before")
+    def validate_amount(cls, value):
+        if value <= 0:
+            raise ValueError("Amount must be greater than 0")
+        return value

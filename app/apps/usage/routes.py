@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
+from apps.enrollment.models import Enrollment
+from core.exceptions import BaseHTTPException
 from fastapi import Request
+from fastapi_mongo_base.schemas import PaginatedResponse
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
-
-from core.exceptions import BaseHTTPException
 
 from .models import Usage
 from .schemas import UsageCreateSchema, UsagePart, UsageSchema
@@ -106,8 +107,23 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
             The list of usages.
         """
-        # TODO: Implement the list_items method
-        return await super().list_items(request, offset, limit)
+        auth = await self.get_auth(request)
+        items, total = await self.model.list_total_combined(
+            user_id=auth.user_id,
+            business_name=auth.business.name,
+            offset=offset,
+            limit=limit,
+            asset=asset,
+            variant=variant,
+            created_at_from=created_at_from,
+            created_at_to=created_at_to,
+        )
+
+        items_in_schema = [self.list_item_schema(**item.model_dump()) for item in items]
+
+        return PaginatedResponse(
+            items=items_in_schema, offset=offset, limit=limit, total=total
+        )
 
     async def retrieve_item(self, request: Request, uid: uuid.UUID):
         """
@@ -171,7 +187,9 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
         if len(enrollment_quotas) == 0:
             raise BaseHTTPException(
-                status_code=402, detail="No enrollment is available for the usage"
+                status_code=402,
+                error="insufficient_enrollment",
+                message="No enrollment is available for the usage",
             )
 
         # logging.info(f'Enrollment quotas {enrollment_quotas}')
@@ -210,6 +228,33 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
             The canceled usage.
         """
+        auth = await self.get_auth(request)
+        item: Usage = await self.model.get_item(uid, business_name=auth.business.name)
+        cancel_parts = []
+        for part in item.parts:
+            enrollment: Enrollment = await Enrollment.get_item(part.enrollment_id)
+            leftover_bundles = await enrollment.get_leftover_bundles()
+            for bundle in leftover_bundles:
+                if bundle.asset == item.asset:
+                    bundle.quota += part.amount
+            new_part = UsagePart(
+                enrollment_id=enrollment.uid,
+                amount=-part.amount,
+                leftover_bundles=leftover_bundles,  # TODO check if the leftover bundles are correct
+            )
+            cancel_parts.append(new_part)
+
+        cancel_item = Usage(
+            business_name=auth.business.name,
+            user_id=auth.user_id,
+            asset=item.asset,
+            amount=item.amount,
+            variant=item.variant,
+            meta_data=item.meta_data,
+            parts=cancel_parts,
+        )
+        await cancel_item.save()
+        return cancel_item
 
 
 router = UsageRouter().router

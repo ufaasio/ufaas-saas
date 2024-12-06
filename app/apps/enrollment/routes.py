@@ -1,11 +1,12 @@
+import logging
 import uuid
+from datetime import datetime
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
-
-from server.config import Settings
 
 from .models import Enrollment
 from .schemas import (
@@ -38,6 +39,14 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         asset: str = None,
         variant: str = None,
         is_valid: bool = True,
+        created_at_from: datetime = None,
+        created_at_to: datetime = None,
+        start_at_from: datetime = None,
+        start_at_to: datetime = None,
+        expire_at_from: datetime = None,
+        expire_at_to: datetime = None,
+        due_date_from: datetime = None,
+        due_date_to: datetime = None,
     ):
         """
         Retrieve a list of enrollments with pagination.
@@ -68,6 +77,14 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             asset=asset,
             variant=variant,
             is_valid=is_valid,
+            create_at_from=created_at_from,
+            create_at_to=created_at_to,
+            start_at_from=start_at_from,
+            start_at_to=start_at_to,
+            expire_at_from=expire_at_from,
+            expire_at_to=expire_at_to,
+            due_date_from=due_date_from,
+            due_date_to=due_date_to,
         )
         items_in_schema = [
             self.list_item_schema(
@@ -114,7 +131,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             - start_at: datetime, start date of the enrollment, default set now if not provided
             - expire_at: datetime | None, expiration date of the enrollment for the selected bundles, default None
             - duration: int | None, duration of the enrollment in days, default None
-            - status: "active" | "expired", the status of the enrollment, default "active"
+            - status: "active" | "inactive", the status of the enrollment, default "active"
             - bundles: list[Bundle], list of bundles that are included in the enrollment. Each bundle should have a asset, quota, and unit.
                 asset: str, the asset name (For example, "Storage" in storage service, "Tokens" in LLM API service, ...)
                 quota: Decimal, the quota of the asset
@@ -138,6 +155,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
 
         data: dict = data.model_dump()
         data.pop("user_id", None)
+
+        logging.info(data)
 
         item = self.model(
             business_name=auth.business.name,

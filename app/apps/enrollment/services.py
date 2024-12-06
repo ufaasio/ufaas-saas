@@ -1,8 +1,7 @@
 import uuid
 
-from pymongo import ASCENDING, DESCENDING
-
 from apps.enrollment.models import Enrollment
+from pymongo import ASCENDING, DESCENDING
 
 
 async def get_active_enrollments(
@@ -32,9 +31,9 @@ async def get_active_enrollments(
         {"$match": {"$and": base_query}},
         {
             "$addFields": {
-                "expired_at_null": {
+                "expire_at_null": {
                     "$cond": {
-                        "if": {"$eq": ["$expired_at", None]},
+                        "if": {"$eq": ["$expire_at", None]},
                         "then": 1,
                         "else": 0,
                     }
@@ -44,26 +43,36 @@ async def get_active_enrollments(
         {
             "$sort": {
                 "variant": DESCENDING,  # Sort by variant
-                "expired_at_null": ASCENDING,  # Sort nulls last (1 for null, 0 for non-null)
-                "expired_at": ASCENDING,  # Sort by expired_at for non-null values
+                "expire_at_null": ASCENDING,  # Sort nulls last (1 for null, 0 for non-null)
+                "expire_at": ASCENDING,  # Sort by expire_at for non-null values
             }
         },
     ]
-
-    import logging
-
-    import json_advanced as json
-
-    logging.info(json.dumps(pipeline, indent=4))
 
     # pipeline_result: list[dict] = await Enrollment.aggregate(pipeline).to_list()
     active_enrollments = [
         Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
     ]
+
+    # import logging
+    # import json_advanced as json
+
+    # all_enrollments = await Enrollment.find({}).to_list()
+
+    # logging.info(
+    #     "\n".join(
+    #         [
+    #             f"Active enrollments: {active_enrollments}",
+    #             # f"{len(all_enrollments)}: {json.dumps(all_enrollments, indent=2)}",
+    #             # f"{json.dumps(pipeline, indent=2)}",
+    #         ]
+    #     )
+    # )
+
     return active_enrollments
 
     # active_enrollments: list[Enrollment] = (
     #     await Enrollment.find(base_query)
-    #     .sort([("variant", DESCENDING), ("expired_at", ASCENDING)])
+    #     .sort([("variant", DESCENDING), ("expire_at", ASCENDING)])
     #     .to_list()
     # )

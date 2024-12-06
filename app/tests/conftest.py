@@ -10,11 +10,10 @@ import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
-from ufaas_fastapi_business.models import Business
-
 from server.config import Settings
 from server.server import app as fastapi_app
 from tests.constants import StaticData
+from ufaas_fastapi_business.models import Business
 from utils.basic import get_all_subclasses
 
 
@@ -88,29 +87,29 @@ def enrollment_dicts():
     enrollment_dicts = []
     enrollment_dicts.append(
         dict(
-            expired_at=now + timedelta(seconds=2),
+            expire_at=now + timedelta(seconds=2),
             bundles=[dict(asset="image", quota=10)],
         )
     )
     enrollment_dicts.append(
-        dict(expired_at=None, bundles=[dict(asset="image", quota=10)])
+        dict(expire_at=None, bundles=[dict(asset="image", quota=10)])
     )
     enrollment_dicts.append(
         dict(
-            expired_at=now + timedelta(seconds=11),
+            expire_at=now + timedelta(seconds=11),
             bundles=[dict(asset="image", quota=10)],
             variant="variant",
         )
     )
     enrollment_dicts.append(
         dict(
-            expired_at=now + timedelta(seconds=1),
+            expire_at=now + timedelta(seconds=1),
             bundles=[dict(asset="image", quota=10), dict(asset="text", quota=10)],
         )
     )
     enrollment_dicts.append(
         dict(
-            expired_at=now + timedelta(seconds=100),
+            expire_at=now + timedelta(seconds=100),
             bundles=[dict(asset="text", quota=10)],
         )
     )

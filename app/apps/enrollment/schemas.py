@@ -6,8 +6,9 @@ from typing import Literal
 
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 from utils.numtools import decimal_amount
+
+# from .schemas import Bundle, EnrollmentSchema
 
 
 class Bundle(BaseModel):
@@ -40,9 +41,9 @@ class EnrollmentSchema(BusinessOwnedEntitySchema):
     price: Decimal = Decimal(0)
     acquisition_type: AcquisitionType = AcquisitionType.purchased
     invoice_id: str | None = None
-    started_at: datetime = Field(default_factory=datetime.now)
-    expired_at: datetime | None = None
-    status: Literal["active", "expired"] = "active"
+    start_at: datetime = Field(default_factory=datetime.now)
+    expire_at: datetime | None = None
+    status: Literal["active", "inactive"] = "active"
 
     bundles: list[Bundle]
     variant: str | None = None
@@ -76,7 +77,7 @@ class EnrollmentCreateSchema(BaseModel):
     start_at: datetime = Field(default_factory=datetime.now)
     expire_at: datetime | None = None
     duration: int | None = Field(None, alias="duration_days")
-    status: Literal["active", "expired"] = "active"
+    status: Literal["active", "inactive"] = "active"
     acquisition_type: AcquisitionType = AcquisitionType.purchased
 
     variant: str | None = None
@@ -102,7 +103,7 @@ class EnrollmentUpdateSchema(BaseModel):
     invoice_id: str | None = None
     # start_at: datetime = Field(default_factory=datetime.now)
     # expire_at: datetime | None = None
-    status: Literal["active", "expired"] = "active"
+    status: Literal["active", "inactive"] = "active"
     acquisition_type: AcquisitionType = AcquisitionType.purchased
     meta_data: dict | None = None
 

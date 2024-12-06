@@ -18,8 +18,8 @@ async def get_or_create_freemium_enrollment(
             "user_id": user_id,
             "acquisition_type": "freemium",
             "status": "active",
-            "started_at": {"$lte": now},
-            "expired_at": {"$gt": now},  # Still active for the current period
+            "starte_at": {"$lte": now},
+            "expire_at": {"$gt": now},  # Still active for the current period
         }
     )
 
@@ -31,8 +31,8 @@ async def get_or_create_freemium_enrollment(
         business_name=business_name,
         acquisition_type=AcquisitionType.freemium,
         status="active",
-        started_at=now,
-        expired_at=now + timedelta(days=freemium_quotas.period_days),
+        start_at=now,
+        expire_at=now + timedelta(days=freemium_quotas.period_days),
         bundles=freemium_quotas.bundles,
         variant=freemium_quotas.variant,
     )
@@ -148,6 +148,6 @@ async def select_enrollment(
         if residual == 0:
             return selected_enrollments
 
-    # create borrow enrollment
+    # TODO create borrow enrollment
 
     return selected_enrollments

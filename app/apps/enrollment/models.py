@@ -22,6 +22,14 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         asset: str = None,
         variant: str = None,
         is_valid: bool = True,
+        created_at_from: datetime = None,
+        created_at_to: datetime = None,
+        start_at_from: datetime = None,
+        start_at_to: datetime = None,
+        expire_at_from: datetime = None,
+        expire_at_to: datetime = None,
+        due_date_from: datetime = None,
+        due_date_to: datetime = None,
         *args,
         **kwargs
     ) -> FindMany:
@@ -50,6 +58,22 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             query = query.filter(cls.bundles.asset == asset)
         if variant:
             query = query.filter(cls.variant == variant)
+        if created_at_from:
+            query = query.filter(cls.created_at >= created_at_from)
+        if created_at_to:
+            query = query.filter(cls.created_at <= created_at_to)
+        if start_at_from:
+            query = query.filter(cls.start_at >= start_at_from)
+        if start_at_to:
+            query = query.filter(cls.start_at <= start_at_to)
+        if expire_at_from:
+            query = query.filter(cls.expire_at >= expire_at_from)
+        if expire_at_to:
+            query = query.filter(cls.expire_at <= expire_at_to)
+        if due_date_from:
+            query = query.filter(cls.due_date >= due_date_from)
+        if due_date_to:
+            query = query.filter(cls.due_date <= due_date_to)
         return query
 
     async def get_leftover_bundles(self) -> list[Bundle]:
@@ -57,7 +81,9 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
 
         latest_usage = await Usage.get_latest_usage(self.uid)
         if latest_usage:
-            return latest_usage.leftover_bundles
+            for part in latest_usage.parts:
+                if part.enrollment_id == self.uid:
+                    return part.leftover_bundles
         return self.bundles
 
     @classmethod
@@ -75,7 +101,7 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         base_query = [
             {"business_name": business_name},
             {"is_deleted": is_deleted},
-            {"started_at": {"$lt": now}},
+            {"start_at": {"$lt": now}},
             {"status": "active"},
             {
                 "$or": [
@@ -99,8 +125,8 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             },
             {
                 "$or": [
-                    {"expired_at": {"$gt": now}},  # expire_at after now
-                    {"expired_at": None},  # or expire_at is None
+                    {"expire_at": {"$gt": now}},  # expire_at after now
+                    {"expire_at": None},  # or expire_at is None
                 ]
             },
             # {
