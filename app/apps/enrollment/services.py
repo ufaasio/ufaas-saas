@@ -1,7 +1,8 @@
 import uuid
 
-from apps.enrollment.models import Enrollment
 from pymongo import ASCENDING, DESCENDING
+
+from apps.enrollment.models import Enrollment
 
 
 async def get_active_enrollments(

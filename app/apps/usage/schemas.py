@@ -1,13 +1,14 @@
 import uuid
 from decimal import Decimal
 
-from apps.enrollment.schemas import Bundle
+from fastapi_mongo_base._utils.bsontools import decimal_amount
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, field_validator, model_validator
-from utils.numtools import decimal_amount
+
+from apps.enrollment.schemas import Bundle
 
 
-class UsagePart(BaseModel):
+class UsageConsumption(BaseModel):
     enrollment_id: uuid.UUID
     amount: Decimal
     leftover_bundles: list[Bundle] = []
@@ -22,12 +23,12 @@ class UsageSchema(BusinessOwnedEntitySchema):
     # asset: str
     # amount: Decimal
 
-    parts: list[UsagePart]
+    consumptions: list[UsageConsumption]
     asset: str
     amount: Decimal
     variant: str | None = None
 
-    @field_validator("parts")
+    @field_validator("consumptions")
     def validate_enrollments_id(cls, value):
         if not value:
             raise ValueError("enrollments_id must not be empty")

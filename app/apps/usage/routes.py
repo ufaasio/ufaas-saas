@@ -1,15 +1,16 @@
 import uuid
 from datetime import datetime
 
-from apps.enrollment.models import Enrollment
-from core.exceptions import BaseHTTPException
 from fastapi import Request
 from fastapi_mongo_base.schemas import PaginatedResponse
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
+from apps.enrollment.models import Enrollment
+from core.exceptions import BaseHTTPException
+
 from .models import Usage
-from .schemas import UsageCreateSchema, UsagePart, UsageSchema
+from .schemas import UsageConsumption, UsageCreateSchema, UsageSchema
 from .services import select_enrollment
 
 
@@ -194,15 +195,15 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
         # logging.info(f'Enrollment quotas {enrollment_quotas}')
 
-        parts: list[Usage] = []
+        consumptions: list[Usage] = []
         for enrollment, quota, leftover_bundles in enrollment_quotas:
             # create usage
-            part = UsagePart(
+            consumption = UsageConsumption(
                 enrollment_id=enrollment.uid,
                 amount=quota,
                 leftover_bundles=leftover_bundles,
             )
-            parts.append(part)
+            consumptions.append(consumption)
 
         item = Usage(
             business_name=auth.business.name,
@@ -211,7 +212,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             amount=quota,
             variant=data.variant,
             meta_data=data.meta_data,
-            parts=parts,
+            consumptions=consumptions,
         )
         await item.save()
         return item
@@ -230,19 +231,21 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
         """
         auth = await self.get_auth(request)
         item: Usage = await self.model.get_item(uid, business_name=auth.business.name)
-        cancel_parts = []
-        for part in item.parts:
-            enrollment: Enrollment = await Enrollment.get_item(part.enrollment_id)
+        cancel_consumptions = []
+        for consumption in item.consumptions:
+            enrollment: Enrollment = await Enrollment.get_item(
+                consumption.enrollment_id
+            )
             leftover_bundles = await enrollment.get_leftover_bundles()
             for bundle in leftover_bundles:
                 if bundle.asset == item.asset:
-                    bundle.quota += part.amount
-            new_part = UsagePart(
+                    bundle.quota += consumption.amount
+            new_consumption = UsageConsumption(
                 enrollment_id=enrollment.uid,
-                amount=-part.amount,
+                amount=-consumption.amount,
                 leftover_bundles=leftover_bundles,  # TODO check if the leftover bundles are correct
             )
-            cancel_parts.append(new_part)
+            cancel_consumptions.append(new_consumption)
 
         cancel_item = Usage(
             business_name=auth.business.name,
@@ -251,7 +254,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             amount=item.amount,
             variant=item.variant,
             meta_data=item.meta_data,
-            parts=cancel_parts,
+            consumptions=cancel_consumptions,
         )
         await cancel_item.save()
         return cancel_item

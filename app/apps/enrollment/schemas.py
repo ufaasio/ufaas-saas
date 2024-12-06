@@ -4,9 +4,9 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal
 
+from fastapi_mongo_base._utils.bsontools import decimal_amount
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from utils.numtools import decimal_amount
 
 # from .schemas import Bundle, EnrollmentSchema
 
@@ -43,6 +43,7 @@ class EnrollmentSchema(BusinessOwnedEntitySchema):
     invoice_id: str | None = None
     start_at: datetime = Field(default_factory=datetime.now)
     expire_at: datetime | None = None
+    duration: int | None = None
     status: Literal["active", "inactive"] = "active"
 
     bundles: list[Bundle]

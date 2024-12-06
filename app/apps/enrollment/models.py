@@ -81,9 +81,9 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
 
         latest_usage = await Usage.get_latest_usage(self.uid)
         if latest_usage:
-            for part in latest_usage.parts:
-                if part.enrollment_id == self.uid:
-                    return part.leftover_bundles
+            for consumption in latest_usage.consumptions:
+                if consumption.enrollment_id == self.uid:
+                    return consumption.leftover_bundles
         return self.bundles
 
     @classmethod
