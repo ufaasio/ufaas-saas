@@ -37,7 +37,7 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
     ) -> FindMany:
         if is_valid and not uid:
             return cls.find(
-                cls.get_active_enrollments_base_query(
+                *cls.get_active_enrollments_base_query(
                     business_name=business_name,
                     user_id=user_id,
                     asset=asset,
