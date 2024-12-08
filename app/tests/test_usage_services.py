@@ -17,7 +17,7 @@ async def test_select_enrollment_normal(constants: StaticData, enrollments):
     amount = 5
     variant = None
     enrollment_id = None
-    enrollment_quotas = await select_enrollment(
+    enrollment_quotas, residual = await select_enrollment(
         business_name=business_name,
         user_id=user_id,
         asset=asset,
@@ -35,7 +35,7 @@ async def test_select_enrollment_normal(constants: StaticData, enrollments):
 
 @pytest.mark.asyncio
 async def test_select_enrollment_large(constants: StaticData, enrollments):
-    enrollment_quotas = await select_enrollment(
+    enrollment_quotas, residual = await select_enrollment(
         business_name=constants.business_name_1,
         user_id=uuid.UUID(constants.user_id_1_1),
         asset="image",
@@ -52,7 +52,7 @@ async def test_select_enrollment_large(constants: StaticData, enrollments):
 
 @pytest.mark.asyncio
 async def test_select_enrollment_large_variant(constants: StaticData, enrollments):
-    enrollment_quotas = await select_enrollment(
+    enrollment_quotas, residual = await select_enrollment(
         business_name=constants.business_name_1,
         user_id=uuid.UUID(constants.user_id_1_1),
         asset="image",
@@ -71,7 +71,7 @@ async def test_select_enrollment_large_variant(constants: StaticData, enrollment
 @pytest.mark.asyncio
 async def test_select_enrollment_delayed(constants: StaticData, enrollments):
     time.sleep(2)
-    enrollment_quotas = await select_enrollment(
+    enrollment_quotas, residual = await select_enrollment(
         business_name=constants.business_name_1,
         user_id=uuid.UUID(constants.user_id_1_1),
         asset="image",

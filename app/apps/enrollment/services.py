@@ -1,8 +1,11 @@
 import uuid
+from datetime import datetime, timedelta
 
 from pymongo import ASCENDING, DESCENDING
 
+from apps.config.models import Configuration
 from apps.enrollment.models import Enrollment
+from apps.enrollment.schemas import AcquisitionType, Bundle
 
 
 async def get_active_enrollments(
@@ -77,3 +80,25 @@ async def get_active_enrollments(
     #     .sort([("variant", DESCENDING), ("expire_at", ASCENDING)])
     #     .to_list()
     # )
+
+
+async def borrow_enrollment(business_name, user_id, asset, amount, variant):
+    now = datetime.now() - timedelta(minutes=1)
+    config = (await Configuration.get_config(business_name)) or Configuration(
+        business_name=business_name
+    )
+    borrowed_enrollment = Enrollment(
+        user_id=user_id,
+        business_name=business_name,
+        acquisition_type=AcquisitionType.borrowed,
+        status="active",
+        start_at=now,
+        expire_at=now + timedelta(minutes=30),
+        bundles=[Bundle(asset=asset, quota=amount)],
+        variant=variant,
+        due_date=now
+        + timedelta(days=config.default_borrow_period)
+        + timedelta(minutes=30),
+    )
+    await borrowed_enrollment.save()
+    return borrowed_enrollment

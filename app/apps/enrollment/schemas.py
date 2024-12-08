@@ -33,8 +33,19 @@ class AcquisitionType(str, Enum):
     # subscription = "subscription"
     # on_demand = "on_demand"
     borrowed = "borrowed"
-    freemium = "freemium"
+    # freemium = "freemium"
     postpaid = "postpaid"
+
+    @classmethod
+    def normal_types(cls):
+        return [
+            cls.trial,
+            cls.purchased,
+            cls.gifted,
+            cls.promotion,
+            cls.borrowed,
+            cls.postpaid,
+        ]
 
 
 class EnrollmentSchema(BusinessOwnedEntitySchema):
@@ -50,7 +61,7 @@ class EnrollmentSchema(BusinessOwnedEntitySchema):
     variant: str | None = None
 
     due_date: datetime | None = None
-    is_paid: bool | None = None
+    paid_at: datetime | None = None
 
     @field_validator("price", mode="before")
     def validate_price(cls, value):
@@ -61,7 +72,7 @@ class EnrollmentSchema(BusinessOwnedEntitySchema):
         if data.acquisition_type == AcquisitionType.borrowed and not data.due_date:
             raise ValueError("Due date must be provided for borrowed acquisitions")
         if data.acquisition_type == AcquisitionType.borrowed:
-            data.is_paid = False if data.is_paid is None else data.is_paid
+            data.paid_at = False if data.paid_at is None else data.paid_at
         return data
 
 
@@ -109,7 +120,7 @@ class EnrollmentUpdateSchema(BaseModel):
     meta_data: dict | None = None
 
     due_date: datetime | None = None
-    is_paid: bool = False
+    paid_at: datetime | None = None
 
 
 class FreemiumQuota(BaseModel):

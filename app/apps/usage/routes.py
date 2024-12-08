@@ -7,11 +7,10 @@ from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 
 from apps.enrollment.models import Enrollment
-from core.exceptions import BaseHTTPException
 
 from .models import Usage
 from .schemas import UsageConsumption, UsageCreateSchema, UsageSchema
-from .services import select_enrollment
+from .services import create_usage
 
 
 class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
@@ -140,7 +139,9 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
         """
         return await super().retrieve_item(request, uid)
 
-    async def create_item(self, request: Request, data: UsageCreateSchema):
+    async def create_item(
+        self, request: Request, data: UsageCreateSchema, borrow: bool = False
+    ):
         """
         Create an usage item and calculate the leftover bundles.
 
@@ -177,42 +178,15 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
         # logging.info(f'Creating usage {auth.issuer_type}, {auth.business.name}, {auth.user_id}, {data}')
 
-        enrollment_quotas = await select_enrollment(
+        item = await create_usage(
             business_name=auth.business.name,
             user_id=auth.user_id,
             asset=data.asset,
             amount=data.amount,
             variant=data.variant,
             enrollment_id=data.enrollment_id,
-        )
-
-        if len(enrollment_quotas) == 0:
-            raise BaseHTTPException(
-                status_code=402,
-                error="insufficient_enrollment",
-                message="No enrollment is available for the usage",
-            )
-
-        # logging.info(f'Enrollment quotas {enrollment_quotas}')
-
-        consumptions: list[Usage] = []
-        for enrollment, quota, leftover_bundles in enrollment_quotas:
-            # create usage
-            consumption = UsageConsumption(
-                enrollment_id=enrollment.uid,
-                amount=quota,
-                leftover_bundles=leftover_bundles,
-            )
-            consumptions.append(consumption)
-
-        item = Usage(
-            business_name=auth.business.name,
-            user_id=auth.user_id,
-            asset=data.asset,
-            amount=quota,
-            variant=data.variant,
             meta_data=data.meta_data,
-            consumptions=consumptions,
+            borrow=borrow,
         )
         await item.save()
         return item

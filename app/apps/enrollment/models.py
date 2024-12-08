@@ -5,7 +5,7 @@ from beanie.odm.queries.find import FindMany
 from bson import UUID_SUBTYPE, Binary
 from fastapi_mongo_base.models import BusinessOwnedEntity
 
-from .schemas import Bundle, EnrollmentSchema
+from .schemas import AcquisitionType, Bundle, EnrollmentSchema
 
 
 class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
@@ -30,8 +30,10 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         expire_at_to: datetime = None,
         due_date_from: datetime = None,
         due_date_to: datetime = None,
+        paid_at_from: datetime = None,
+        paid_at_to: datetime = None,
         *args,
-        **kwargs
+        **kwargs,
     ) -> FindMany:
         if is_valid and not uid:
             return cls.find(
@@ -42,7 +44,7 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
                     variant=variant,
                     is_deleted=is_deleted,
                     *args,
-                    **kwargs
+                    **kwargs,
                 )
             )
 
@@ -52,7 +54,7 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             is_deleted=is_deleted,
             uid=uid,
             *args,
-            **kwargs
+            **kwargs,
         )
         if asset:
             query = query.filter(cls.bundles.asset == asset)
@@ -74,6 +76,10 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             query = query.filter(cls.due_date >= due_date_from)
         if due_date_to:
             query = query.filter(cls.due_date <= due_date_to)
+        if paid_at_from:
+            query = query.filter(cls.paid_at >= paid_at_from)
+        if paid_at_to:
+            query = query.filter(cls.paid_at <= paid_at_to)
         return query
 
     async def get_leftover_bundles(self) -> list[Bundle]:
@@ -95,6 +101,7 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         variant: str = None,
         enrollment_id: uuid.UUID = None,
         is_deleted: bool = False,
+        **kwargs,
     ) -> list[dict]:
         now = datetime.now()
 
@@ -106,20 +113,12 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             {
                 "$or": [
                     {
-                        "acquisition_type": {
-                            "$in": [
-                                "purchased",
-                                "promotion",
-                                "postpaid",
-                                "trial",
-                                "gifted",
-                            ]
-                        },
+                        "acquisition_type": {"$in": AcquisitionType.normal_types()},
                     },
                     {
                         "acquisition_type": "borrowed",
                         "due_date": {"$gt": now},
-                        "is_paid": False,
+                        "paid_at": {"$ne": None},
                     },
                 ]
             },
@@ -148,3 +147,17 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             base_query.append({"bundles.asset": asset})
 
         return base_query
+
+    @classmethod
+    async def overdue_enrollments(cls, user_id: uuid.UUID) -> list["Enrollment"]:
+        now = datetime.now()
+        return await cls.find(
+            {
+                "user_id": user_id,
+                "acquisition_type": "borrowed",
+                # "status": "active",
+                "due_date": {"$lt": now},
+                "paid_at": None,
+            }
+        ).to_list()
+        return bool(overdue_enrollments)

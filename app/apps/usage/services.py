@@ -4,7 +4,11 @@ from decimal import Decimal
 
 from apps.enrollment.models import Enrollment
 from apps.enrollment.schemas import AcquisitionType, Bundle, FreemiumQuota
-from apps.enrollment.services import get_active_enrollments
+from apps.enrollment.services import borrow_enrollment, get_active_enrollments
+from core.exceptions import BaseHTTPException
+
+from .models import Usage
+from .schemas import UsageConsumption
 
 
 async def get_or_create_freemium_enrollment(
@@ -109,23 +113,23 @@ async def select_enrollment(
     amount: Decimal = Decimal(1),
     variant: str = None,
     enrollment_id: uuid.UUID = None,
-) -> list[tuple[Enrollment, Decimal]]:
+) -> tuple[list[tuple[Enrollment, Decimal]], Decimal]:
     residual = amount
     selected_enrollments = []
 
-    freemium = await use_freemium_quota(
-        business_name=business_name,
-        user_id=user_id,
-        asset=asset,
-        amount=amount,
-        variant=variant,
-    )
-    if freemium:
-        freemium_enrollment, freemium_quota, leftover_bundles = freemium
-        selected_enrollments.append(
-            (freemium_enrollment, freemium_quota, leftover_bundles)
-        )
-        residual -= freemium_quota
+    # freemium = await use_freemium_quota(
+    #     business_name=business_name,
+    #     user_id=user_id,
+    #     asset=asset,
+    #     amount=amount,
+    #     variant=variant,
+    # )
+    # if freemium:
+    #     freemium_enrollment, freemium_quota, leftover_bundles = freemium
+    #     selected_enrollments.append(
+    #         (freemium_enrollment, freemium_quota, leftover_bundles)
+    #     )
+    #     residual -= freemium_quota
 
     active_enrollments = await get_active_enrollments(
         business_name=business_name,
@@ -146,8 +150,66 @@ async def select_enrollment(
         residual -= using_quota
         selected_enrollments.append((enrollment, using_quota, leftover_bundles))
         if residual == 0:
-            return selected_enrollments
+            break
 
-    # TODO create borrow enrollment
+    return selected_enrollments, residual
 
-    return selected_enrollments
+
+async def create_usage(
+    business_name: str,
+    user_id: uuid.UUID,
+    asset: str,
+    amount: Decimal = Decimal(1),
+    variant: str = None,
+    enrollment_id: uuid.UUID = None,
+    meta_data: dict = None,
+    borrow: bool = False,
+):
+    enrollment_quotas, residual = await select_enrollment(
+        business_name=business_name,
+        user_id=user_id,
+        asset=asset,
+        amount=amount,
+        variant=variant,
+        enrollment_id=enrollment_id,
+    )
+
+    if not borrow and residual > 0:
+        raise BaseHTTPException(
+            status_code=402,
+            error="insufficient_enrollment",
+            message="Not enough available resources in active enrollments for the usage",
+        )
+    elif borrow and residual > 0:
+        borrowed_enrollment = await borrow_enrollment(
+            business_name, user_id, asset, residual, variant
+        )
+        enrollment_quotas.append((borrowed_enrollment, residual, []))
+
+    # if len(enrollment_quotas) == 0:
+    #     raise BaseHTTPException(
+    #         status_code=402,
+    #         error="insufficient_enrollment",
+    #         message="No enrollment is available for the usage",
+    #     )
+
+    consumptions: list[Usage] = []
+    for enrollment, quota, leftover_bundles in enrollment_quotas:
+        # create usage
+        consumption = UsageConsumption(
+            enrollment_id=enrollment.uid,
+            amount=quota,
+            leftover_bundles=leftover_bundles,
+        )
+        consumptions.append(consumption)
+
+    item = Usage(
+        business_name=business_name,
+        user_id=user_id,
+        asset=asset,
+        amount=quota,
+        variant=variant,
+        meta_data=meta_data,
+        consumptions=consumptions,
+    )
+    return item

@@ -48,6 +48,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         expire_at_to: datetime = None,
         due_date_from: datetime = None,
         due_date_to: datetime = None,
+        paid_at_from: datetime = None,
+        paid_at_to: datetime = None,
     ):
         """
         Retrieve a list of enrollments with pagination.
@@ -78,14 +80,16 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             asset=asset,
             variant=variant,
             is_valid=is_valid,
-            create_at_from=created_at_from,
-            create_at_to=created_at_to,
+            created_at_from=created_at_from,
+            created_at_to=created_at_to,
             start_at_from=start_at_from,
             start_at_to=start_at_to,
             expire_at_from=expire_at_from,
             expire_at_to=expire_at_to,
             due_date_from=due_date_from,
             due_date_to=due_date_to,
+            paid_at_from=paid_at_from,
+            paid_at_to=paid_at_to,
         )
         items_in_schema = [
             self.list_item_schema(
