@@ -4,8 +4,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal
 
-from fastapi_mongo_base._utils.bsontools import decimal_amount
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
+from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # from .schemas import Bundle, EnrollmentSchema

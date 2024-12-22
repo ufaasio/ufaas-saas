@@ -1,23 +1,19 @@
-import json
 import logging
 from contextlib import asynccontextmanager
 
 import fastapi
-import pydantic
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from json_advanced import dumps
-from usso.exceptions import USSOException
+from fastapi_mongo_base.core import db, exceptions
+from ufaas_fastapi_business.core import middlewares
+from usso.fastapi.integration import EXCEPTION_HANDLERS as USSO_EXCEPTION_HANDLERS
 
-from core import exceptions
-
-from . import config, db, middlewares
+from . import config
 
 
 @asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):  # type: ignore
     """Initialize application services."""
-    await db.init_db()
+    await db.init_mongo_db()
     config.Settings().config_logger()
 
     logging.info("Startup complete")
@@ -44,55 +40,10 @@ app = fastapi.FastAPI(
     lifespan=lifespan,
 )
 
-
-@app.exception_handler(exceptions.BaseHTTPException)
-async def base_http_exception_handler(
-    request: fastapi.Request, exc: exceptions.BaseHTTPException
-):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": exc.message, "error": exc.error},
-    )
-
-
-@app.exception_handler(USSOException)
-async def usso_exception_handler(request: fastapi.Request, exc: USSOException):
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"message": exc.message, "error": exc.error},
-    )
-
-
-@app.exception_handler(pydantic.ValidationError)
-@app.exception_handler(fastapi.exceptions.ResponseValidationError)
-async def pydantic_exception_handler(
-    request: fastapi.Request, exc: pydantic.ValidationError
-):
-    return JSONResponse(
-        status_code=500,
-        content={
-            "message": str(exc),
-            "error": "Exception",
-            "erros": json.loads(dumps(exc.errors())),
-        },
-    )
-
-
-@app.exception_handler(Exception)
-async def general_exception_handler(request: fastapi.Request, exc: Exception):
-    import traceback
-
-    traceback_str = "".join(traceback.format_tb(exc.__traceback__))
-    # body = request._body
-
-    logging.error(f"Exception: {traceback_str} {exc}")
-    logging.error(f"Exception on request: {request.url}")
-    # logging.error(f"Exception on request: {await request.body()}")
-    return JSONResponse(
-        status_code=500,
-        content={"message": str(exc), "error": "Exception"},
-    )
-
+for exc_class, handler in (
+    exceptions.EXCEPTION_HANDLERS | USSO_EXCEPTION_HANDLERS
+).items():
+    app.exception_handler(exc_class)(handler)
 
 origins = [
     "http://localhost:8000",
@@ -137,3 +88,13 @@ async def health(request: fastapi.Request):
         # "forwarded_proto": forwarded_proto,
         # "forwarded_for": forwarded_for,
     }
+
+
+@app.get(f"{config.Settings.base_path}/logs", include_in_schema=False)
+async def logs():
+    from collections import deque
+
+    with open(config.Settings.base_dir / "logs" / "info.log", "rb") as f:
+        last_100_lines = deque(f, maxlen=100)
+
+    return [line.decode("utf-8") for line in last_100_lines]

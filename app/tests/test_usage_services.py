@@ -2,7 +2,6 @@ import time
 import uuid
 
 import pytest
-
 from apps.usage.services import select_enrollment
 from tests.constants import StaticData
 
