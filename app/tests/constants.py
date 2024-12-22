@@ -30,3 +30,4 @@ class StaticData(metaclass=Singleton):
 
     refresh_token = os.getenv("USSO_REFRESH_TOKEN_BUSINESS")
     refresh_token_user = os.getenv("USSO_REFRESH_TOKEN_USER")
+    usso_api_key = os.getenv("USSO_API_KEY")

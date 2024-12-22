@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
-from apps.enrollment.models import Enrollment
 from fastapi import Request
 from fastapi_mongo_base.schemas import PaginatedResponse
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
+
+from apps.enrollment.models import Enrollment
 
 from .models import Usage
 from .schemas import UsageConsumption, UsageCreateSchema, UsageSchema
