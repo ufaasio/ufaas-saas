@@ -4,9 +4,10 @@ from datetime import datetime
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
-from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
+
+from server.config import Settings
 
 from .models import Enrollment
 from .schemas import (

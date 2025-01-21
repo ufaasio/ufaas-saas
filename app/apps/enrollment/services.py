@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, timedelta
 
+from pymongo import ASCENDING, DESCENDING
+
 from apps.config.models import Configuration
 from apps.enrollment.models import Enrollment
 from apps.enrollment.schemas import AcquisitionType, Bundle
-from pymongo import ASCENDING, DESCENDING
 
 
 async def get_active_enrollments(

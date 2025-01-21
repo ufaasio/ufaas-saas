@@ -1,6 +1,7 @@
+from fastapi_mongo_base.core import app_factory
+
 from apps.enrollment.routes import router as enrollment_router
 from apps.usage.routes import router as usage_router
-from fastapi_mongo_base.core import app_factory
 
 from . import config
 

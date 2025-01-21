@@ -11,11 +11,12 @@ import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
 from fastapi_mongo_base.utils.basic import get_all_subclasses
+from ufaas_fastapi_business.models import Business
+from usso.session import UssoSession
+
 from server.config import Settings
 from server.server import app as fastapi_app
 from tests.constants import StaticData
-from ufaas_fastapi_business.models import Business
-from usso.session import UssoSession
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -189,11 +190,3 @@ async def access_token_user():
         user_id=StaticData.user_id_1_2,
     )
     return usso_session.access_token
-
-
-@pytest_asyncio.fixture(scope="session")
-async def auth_headers_business(access_token_business):
-    return {
-        "Authorization": f"Bearer {access_token_business}",
-        "Content-Type": "application/json",
-    }
