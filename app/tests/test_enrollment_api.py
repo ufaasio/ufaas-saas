@@ -5,7 +5,6 @@ import uuid
 import httpx
 import json_advanced as json
 import pytest
-
 from tests.constants import StaticData
 
 uid = lambda i: uuid.UUID(f"{i:032}")

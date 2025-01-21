@@ -1,6 +1,6 @@
 uvicorn
 fastapi
-pydantic
+pydantic[email]
 httpx
 
 singleton_package
@@ -11,8 +11,11 @@ ipython
 
 aiofiles
 aiocache
-usso[fastapi]
 
 beanie
 fastapi-mongo-base
 ufaas-fastapi-business
+
+usso[fastapi]
+ufaas
+ufiles

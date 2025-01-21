@@ -4,10 +4,9 @@ from datetime import datetime
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from server.config import Settings
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
-
-from server.config import Settings
 
 from .models import Enrollment
 from .schemas import (
@@ -15,6 +14,7 @@ from .schemas import (
     EnrollmentDetailSchema,
     EnrollmentSchema,
     EnrollmentUpdateSchema,
+    QuotasResponseSchema,
 )
 
 
@@ -27,9 +27,56 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
     def config_schemas(self, schema, **kwargs):
         super().config_schemas(schema, **kwargs)
         self.delete_response_schema = EnrollmentSchema
+        self.quotas_response_schema = QuotasResponseSchema
 
     def config_routes(self, **kwargs):
         super().config_routes(**kwargs)
+        self.router.add_api_route(
+            f"/quotas",
+            self.quotas,
+            methods=["GET"],
+            response_model=self.quotas_response_schema,
+            status_code=200,
+        )
+
+    async def quotas(
+        self,
+        request: Request,
+        asset: str,
+        user_id: uuid.UUID = None,
+        variant: str = None,
+    ):
+        """
+        Retrieve the total quotas of an asset for a user
+        """
+        auth = await self.get_auth(request)
+        if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
+            raise AuthorizationException("User cannot list other user's enrollment")
+
+        overdue_enrollments = await Enrollment.overdue_enrollments(
+            auth.business.name, user_id
+        )
+
+        logging.info(f"overdue_enrollments: {overdue_enrollments}, {asset}, {variant}")
+
+        quotas = await Enrollment.quotas(
+            business_name=auth.business.name,
+            user_id=auth.user_id,
+            asset=asset,
+            variant=variant,
+        )
+
+        logging.info(f"quotas: {quotas}, {asset}, {variant}")
+
+        return QuotasResponseSchema(
+            **{
+                "quota": quotas if not overdue_enrollments else 0,
+                "overdue": bool(overdue_enrollments),
+                "asset": asset,
+                "variant": variant,
+                "_quota": quotas,
+            }
+        )
 
     async def list_items(
         self,

@@ -1,5 +1,6 @@
 """FastAPI server configuration."""
 
+import dataclasses
 import os
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from ufaas_fastapi_business.core.config import Settings as BaseSettings
 dotenv.load_dotenv()
 
 
+@dataclasses.dataclass
 class Settings(BaseSettings):
     """Server config settings."""
 

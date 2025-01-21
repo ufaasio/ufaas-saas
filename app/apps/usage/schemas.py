@@ -1,38 +1,16 @@
 import uuid
 from decimal import Decimal
 
+from apps.enrollment.schemas import Bundle
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, field_validator, model_validator
-
-from apps.enrollment.schemas import Bundle
 
 
 class UsageConsumption(BaseModel):
     enrollment_id: uuid.UUID
     amount: Decimal
     leftover_bundles: list[Bundle] = []
-
-    @field_validator("amount", mode="before")
-    def validate_amount(cls, value):
-        return decimal_amount(value)
-
-
-class UsageSchema(BusinessOwnedEntitySchema):
-    # enrollment_id: uuid.UUID
-    # asset: str
-    # amount: Decimal
-
-    consumptions: list[UsageConsumption]
-    asset: str
-    amount: Decimal
-    variant: str | None = None
-
-    @field_validator("consumptions")
-    def validate_enrollments_id(cls, value):
-        if not value:
-            raise ValueError("enrollments_id must not be empty")
-        return value
 
     @field_validator("amount", mode="before")
     def validate_amount(cls, value):
@@ -53,8 +31,37 @@ class UsageCreateSchema(BaseModel):
             raise ValueError("Either user_id or enrollment_id must be provided")
         return item
 
-    @field_validator("amount", mode="before")
-    def validate_amount(cls, value):
+    @field_validator("amount", mode="after")
+    def validate_amount(cls, value: Decimal):
         if value <= 0:
             raise ValueError("Amount must be greater than 0")
         return value
+
+
+class UsageSchema(BusinessOwnedEntitySchema):
+    # enrollment_id: uuid.UUID
+    # asset: str
+    # amount: Decimal
+
+    consumptions: list[UsageConsumption]
+    asset: str
+    amount: Decimal
+    variant: str | None = None
+
+    # @classmethod
+    # def search_field_set(cls) -> list[str]:
+    #     return list(set(super().search_field_set() + ["asset", "variant"]))
+
+    @classmethod
+    def search_exclude_set(cls) -> list[str]:
+        return list(set(super().search_field_set() + ["consumptions"]))
+
+    @field_validator("consumptions")
+    def validate_enrollments_id(cls, value):
+        if not value:
+            raise ValueError("enrollments_id must not be empty")
+        return value
+
+    @field_validator("amount", mode="before")
+    def validate_amount(cls, value):
+        return decimal_amount(value)

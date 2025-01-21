@@ -22,16 +22,6 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         asset: str = None,
         variant: str = None,
         is_valid: bool = True,
-        created_at_from: datetime = None,
-        created_at_to: datetime = None,
-        start_at_from: datetime = None,
-        start_at_to: datetime = None,
-        expire_at_from: datetime = None,
-        expire_at_to: datetime = None,
-        due_date_from: datetime = None,
-        due_date_to: datetime = None,
-        paid_at_from: datetime = None,
-        paid_at_to: datetime = None,
         *args,
         **kwargs,
     ) -> FindMany:
@@ -57,29 +47,8 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             **kwargs,
         )
         if asset:
-            query = query.filter(cls.bundles.asset == asset)
-        if variant:
-            query = query.filter(cls.variant == variant)
-        if created_at_from:
-            query = query.filter(cls.created_at >= created_at_from)
-        if created_at_to:
-            query = query.filter(cls.created_at <= created_at_to)
-        if start_at_from:
-            query = query.filter(cls.start_at >= start_at_from)
-        if start_at_to:
-            query = query.filter(cls.start_at <= start_at_to)
-        if expire_at_from:
-            query = query.filter(cls.expire_at >= expire_at_from)
-        if expire_at_to:
-            query = query.filter(cls.expire_at <= expire_at_to)
-        if due_date_from:
-            query = query.filter(cls.due_date >= due_date_from)
-        if due_date_to:
-            query = query.filter(cls.due_date <= due_date_to)
-        if paid_at_from:
-            query = query.filter(cls.paid_at >= paid_at_from)
-        if paid_at_to:
-            query = query.filter(cls.paid_at <= paid_at_to)
+            query.find({"bundles.asset": asset})
+
         return query
 
     async def get_leftover_bundles(self) -> list[Bundle]:
@@ -136,6 +105,12 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
             # },
         ]
         if enrollment_id:
+            enrollment_id = (
+                uuid.UUID(enrollment_id)
+                if isinstance(enrollment_id, str)
+                else enrollment_id
+            )
+            enrollment_id = Binary.from_uuid(enrollment_id, UUID_SUBTYPE)
             base_query.append({"uid": enrollment_id})
 
         if user_id:
@@ -149,10 +124,13 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
         return base_query
 
     @classmethod
-    async def overdue_enrollments(cls, user_id: uuid.UUID) -> list["Enrollment"]:
+    async def overdue_enrollments(
+        cls, business_name: str, user_id: uuid.UUID
+    ) -> list["Enrollment"]:
         now = datetime.now()
         return await cls.find(
             {
+                "business_name": business_name,
                 "user_id": user_id,
                 "acquisition_type": "borrowed",
                 # "status": "active",
@@ -160,4 +138,37 @@ class Enrollment(EnrollmentSchema, BusinessOwnedEntity):
                 "paid_at": None,
             }
         ).to_list()
-        return bool(overdue_enrollments)
+
+    @classmethod
+    async def quotas(
+        cls,
+        business_name: str,
+        user_id: uuid.UUID,
+        asset: str,
+        variant: str = None,
+    ):
+        """
+        Retrieve the total quotas of an asset for a user
+        """
+        base_query = cls.get_active_enrollments_base_query(
+            business_name=business_name,
+            user_id=user_id,
+            asset=asset,
+            variant=variant,
+        )
+        if variant:
+            base_query.append({"$or": [{"variant": None}, {"variant": variant}]})
+
+        # enrollments = [
+        #     Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
+        # ]
+
+        enrollments = await cls.find({"$and": base_query}).to_list()
+        quota = 0
+        for enrollment in enrollments:
+            quota += sum(
+                bundle.quota
+                for bundle in await enrollment.get_leftover_bundles()
+                if bundle.asset == asset
+            )
+        return quota

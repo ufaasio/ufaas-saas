@@ -1,12 +1,11 @@
 import uuid
 from datetime import datetime
 
+from apps.enrollment.models import Enrollment
 from fastapi import Request
 from fastapi_mongo_base.schemas import PaginatedResponse
 from ufaas_fastapi_business.middlewares import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
-
-from apps.enrollment.models import Enrollment
 
 from .models import Usage
 from .schemas import UsageConsumption, UsageCreateSchema, UsageSchema
@@ -204,11 +203,18 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
             The canceled usage.
         """
         auth = await self.get_auth(request)
-        item: Usage = await self.model.get_item(uid, business_name=auth.business.name)
+        if auth.issuer_type == "User":
+            raise AuthorizationException("User cannot cancel usage")
+
+        item: Usage = await self.model.get_item(
+            uid, user_id=None, business_name=auth.business.name
+        )
         cancel_consumptions = []
         for consumption in item.consumptions:
             enrollment: Enrollment = await Enrollment.get_item(
-                consumption.enrollment_id
+                consumption.enrollment_id,
+                user_id=None,
+                business_name=auth.business.name,
             )
             leftover_bundles = await enrollment.get_leftover_bundles()
             for bundle in leftover_bundles:
@@ -223,7 +229,7 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
 
         cancel_item = Usage(
             business_name=auth.business.name,
-            user_id=auth.user_id,
+            user_id=item.user_id,
             asset=item.asset,
             amount=item.amount,
             variant=item.variant,

@@ -1,8 +1,7 @@
+from core.exceptions import BaseHTTPException
 from fastapi import Request
 from ufaas_fastapi_business.routes import AbstractAuthRouter
 from usso.fastapi import jwt_access_security
-
-from core.exceptions import BaseHTTPException
 
 from .models import Configuration
 from .schemas import Config
