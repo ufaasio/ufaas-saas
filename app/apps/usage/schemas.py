@@ -1,11 +1,10 @@
 import uuid
 from decimal import Decimal
 
+from apps.enrollment.schemas import Bundle
 from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
 from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, field_validator, model_validator
-
-from apps.enrollment.schemas import Bundle
 
 
 class UsageConsumption(BaseModel):

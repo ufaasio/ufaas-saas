@@ -11,12 +11,11 @@ import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
 from fastapi_mongo_base.utils.basic import get_all_subclasses
-from ufaas_fastapi_business.models import Business
-from usso.session import UssoSession
-
 from server.config import Settings
 from server.server import app as fastapi_app
 from tests.constants import StaticData
+from ufaas_fastapi_business.models import Business
+from usso.session import UssoSession
 
 
 @pytest.fixture(scope="session", autouse=True)
