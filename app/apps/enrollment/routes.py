@@ -200,6 +200,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             - AuthorizationException: If the user is not authorized to create an enrollment.
         """
         # only business can create enrollment
+        logging.info(f"create_item: {request.headers} {data}")
         auth = await self.get_auth(request)
         if auth.issuer_type == "User":
             # TODO check scopes
