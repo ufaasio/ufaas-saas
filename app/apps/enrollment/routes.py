@@ -66,9 +66,12 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             variant=variant,
         )
 
-        logging.info(f"quotas: {quotas}, {asset}, {variant}")
+        logging.info(
+            f"{quotas=}, {asset=}, {variant=} {auth.user_id=}"
+        )
 
         return QuotasResponseSchema(
+            user_id=auth.user_id,
             **{
                 "quota": quotas if not overdue_enrollments else 0,
                 "overdue": bool(overdue_enrollments),

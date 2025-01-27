@@ -143,6 +143,7 @@ class FreemiumQuota(BaseModel):
 
 
 class QuotasResponseSchema(BaseModel):
+    user_id: uuid.UUID | None = None
     asset: str
     quota: Decimal
     unit: str | None = None
