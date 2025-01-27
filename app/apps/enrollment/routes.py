@@ -71,8 +71,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         )
 
         return QuotasResponseSchema(
-            user_id=auth.user_id,
             **{
+                "user_id": auth.user_id,
                 "quota": quotas if not overdue_enrollments else 0,
                 "overdue": bool(overdue_enrollments),
                 "asset": asset,
