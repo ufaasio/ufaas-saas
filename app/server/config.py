@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 
 import dotenv
-from ufaas_fastapi_business.core.config import Settings as BaseSettings
+from ufaas_fastapi_business.core import config
 
 dotenv.load_dotenv()
 
 
 @dataclasses.dataclass
-class Settings(BaseSettings):
+class Settings(config.Settings):
     """Server config settings."""
 
     base_dir: Path = Path(__file__).resolve().parent.parent
