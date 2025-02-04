@@ -3,6 +3,7 @@ from datetime import datetime
 
 from apps.enrollment.models import Enrollment
 from fastapi import Request
+from fastapi_mongo_base.core.exceptions import BaseHTTPException
 from fastapi_mongo_base.schemas import PaginatedResponse
 from ufaas_fastapi_business.core.exceptions import AuthorizationException
 from ufaas_fastapi_business.routes import AbstractAuthRouter
@@ -209,6 +210,14 @@ class UsageRouter(AbstractAuthRouter[Usage, UsageSchema]):
         item: Usage = await self.model.get_item(
             uid, user_id=None, business_name=auth.business.name
         )
+
+        if not item:
+            raise BaseHTTPException(
+                status_code=404,
+                error="item_not_found",
+                message=f"{self.model.__name__.capitalize()} not found",
+            )
+
         cancel_consumptions = []
         for consumption in item.consumptions:
             enrollment: Enrollment = await Enrollment.get_item(

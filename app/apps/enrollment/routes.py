@@ -66,9 +66,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             variant=variant,
         )
 
-        logging.info(
-            f"{quotas=}, {asset=}, {variant=} {auth.user_id=}"
-        )
+        logging.info(f"{quotas=}, {asset=}, {variant=} {auth.user_id=}")
 
         return QuotasResponseSchema(
             **{
