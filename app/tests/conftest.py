@@ -72,7 +72,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fastapi_app),
-        base_url="http://test.ufaas.io",
+        base_url="http://test.uln.me",
     ) as ac:
         yield ac
 
@@ -162,7 +162,7 @@ async def enrollments(constants: StaticData, enrollment_dicts):
 async def business(constants: StaticData):
     data = dict(
         name=StaticData.business_name_1,
-        domain="test.ufaas.io",
+        domain="test.uln.me",
         user_id=StaticData.user_id_1_1,
         uid=StaticData.business_id_1,
     )
@@ -174,7 +174,7 @@ async def business(constants: StaticData):
 @pytest_asyncio.fixture(scope="session")
 async def access_token_business():
     usso_session = UssoSession(
-        usso_base_url="https://sso.ufaas.io",
+        usso_base_url="https://sso.uln.me",
         usso_api_key=StaticData.usso_api_key,
         user_id=StaticData.user_id_1_1,
     )
@@ -184,7 +184,7 @@ async def access_token_business():
 @pytest_asyncio.fixture(scope="session")
 async def access_token_user():
     usso_session = UssoSession(
-        usso_base_url="https://sso.ufaas.io",
+        usso_base_url="https://sso.uln.me",
         usso_api_key=StaticData.usso_api_key,
         user_id=StaticData.user_id_1_2,
     )

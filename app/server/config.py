@@ -26,7 +26,7 @@ class Settings(config.Settings):
     business_domains_url = (
         os.getenv(
             "UFAAS_BUSINESS_DOMAINS_URL",
-            "https://business.ufaas.io/api/v1/apps/business",
+            "https://business.uln.me/api/v1/apps/business",
         )
         + "/businesses/"
     )
