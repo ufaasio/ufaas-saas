@@ -5,28 +5,55 @@ import os
 from pathlib import Path
 
 import dotenv
-from ufaas_fastapi_business.core import config
+from fastapi_mongo_base.core import config
 
 dotenv.load_dotenv()
 
 
 @dataclasses.dataclass
 class Settings(config.Settings):
-    """Server config settings."""
-
+    project_name: str = os.getenv("PROJECT_NAME")
     base_dir: Path = Path(__file__).resolve().parent.parent
-    base_path: str = "/api/v1/apps/saas"
-    coverage_dir: Path = base_dir / "htmlcov"
-    currency: str = "IRR"
+    base_path: str = "/api/saas/v1"
 
-    app_id: str = os.getenv("APP_ID")
-    app_secret: str = os.getenv("APP_SECRET")
-    app_scopes: str = os.getenv("APP_SCOPES", default="[]")
-    app_auth_expiry: int = 60  # 1 minute
-    business_domains_url = (
-        os.getenv(
-            "UFAAS_BUSINESS_DOMAINS_URL",
-            "https://business.uln.me/api/v1/apps/business",
-        )
-        + "/businesses/"
+    redis_uri: str = os.getenv("REDIS_URI", default="redis://redis:6379")
+    base_usso_url: str = os.getenv("BASE_USSO_URL", default="https://usso.uln.me")
+    accounting_service_url: str = os.getenv(
+        "ACCOUNTING_SERVICE_URL", default="https://wallets.uln.me"
     )
+
+    @classmethod
+    def get_log_config(cls, console_level: str = "INFO", **kwargs: object) -> dict:
+        log_config = {
+            "formatters": {
+                "standard": {
+                    "format": "[{levelname} {name} : {filename}:{lineno} : {asctime} -> {funcName:10}] {message}",  # noqa: E501
+                    "style": "{",
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "level": console_level,
+                    "formatter": "standard",
+                },
+                "file": {
+                    "class": "logging.FileHandler",
+                    "level": "INFO",
+                    "formatter": "standard",
+                    "filename": "logs/app.log",
+                },
+            },
+            "loggers": {
+                "": {
+                    "handlers": [
+                        "console",
+                        "file",
+                    ],
+                    "level": console_level,
+                    "propagate": True,
+                },
+            },
+            "version": 1,
+        }
+        return log_config

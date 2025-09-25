@@ -1,54 +1,41 @@
 import logging
 import os
-import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
-from typing import AsyncGenerator
 
-import debugpy
 import httpx
 import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
 from fastapi_mongo_base.utils.basic import get_all_subclasses
+
+from apps.enrollment.models import Enrollment
 from server.config import Settings
 from server.server import app as fastapi_app
 from tests.constants import StaticData
-from ufaas_fastapi_business.models import Business
-from usso.session import UssoSession
 
 
 @pytest.fixture(scope="session", autouse=True)
-def setup_debugpy():
+def setup_debugpy() -> None:
     if os.getenv("DEBUGPY", "False").lower() in ("true", "1", "yes"):
-        debugpy.listen(("0.0.0.0", 3020))
-        debugpy.wait_for_client()
+        import debugpy  # noqa: T100
+
+        debugpy.listen(("127.0.0.1", 3020))  # noqa: T100
+        logging.info("Waiting for debugpy client")
+        debugpy.wait_for_client()  # noqa: T100
 
 
 @pytest.fixture(scope="session")
-def mongo_client():
+def mongo_client() -> AsyncGenerator[object]:
     from mongomock_motor import AsyncMongoMockClient
 
     mongo_client = AsyncMongoMockClient()
     yield mongo_client
 
-    # from testcontainers.mongodb import MongoDbContainer
-    # from motor.motor_asyncio import AsyncIOMotorClient
-    # mongo = MongoDbContainer("mongo:latest")
-    # mongo.start()
-    # mongo_uri = mongo.get_connection_url()
-    # mongo_client = AsyncIOMotorClient(mongo_uri)
-    # yield mongo_client
-    # mongo.stop()
-
-    # with MongoDbContainer("mongo:latest") as mongo:
-    #     mongo_uri = mongo.get_connection_url()
-    #     mongo_client = AsyncIOMotorClient(mongo_uri)
-    #     yield mongo_client
-
 
 # Async setup function to initialize the database with Beanie
-async def init_db(mongo_client):
+async def init_db(mongo_client: object) -> None:
     database = mongo_client.get_database("test_db")
     await init_beanie(
         database=database,
@@ -57,7 +44,7 @@ async def init_db(mongo_client):
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def db(mongo_client):
+async def db(mongo_client: object) -> AsyncGenerator[None]:
     Settings.config_logger()
     logging.info("Initializing database")
     await init_db(mongo_client)
@@ -67,62 +54,70 @@ async def db(mongo_client):
 
 
 @pytest_asyncio.fixture(scope="session")
-async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
+async def client() -> AsyncGenerator[httpx.AsyncClient]:
     """Fixture to provide an AsyncClient for FastAPI app."""
-
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fastapi_app),
-        base_url="http://test.uln.me",
+        base_url=f"https://test.uln.me{Settings.base_path}",
+    ) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture(scope="session")
+async def authenticated_client(
+    client: httpx.AsyncClient,
+) -> AsyncGenerator[httpx.AsyncClient]:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=fastapi_app),
+        base_url=client.base_url,
+        headers={"x-api-key": os.getenv("API_KEY")},
     ) as ac:
         yield ac
 
 
 @pytest.fixture(scope="session")
-def constants():
+def constants() -> StaticData:
     return StaticData()
 
 
 @pytest.fixture(scope="module")
-def enrollment_dicts():
+def enrollment_dicts() -> list[dict]:
     now = datetime.now()
 
     enrollment_dicts = []
-    enrollment_dicts.append(
-        dict(
-            expire_at=now + timedelta(seconds=2),
-            bundles=[dict(asset="image", quota=10)],
-        )
-    )
-    enrollment_dicts.append(
-        dict(expire_at=None, bundles=[dict(asset="image", quota=10)])
-    )
-    enrollment_dicts.append(
-        dict(
-            expire_at=now + timedelta(seconds=11),
-            bundles=[dict(asset="image", quota=10)],
-            variant="variant",
-        )
-    )
-    enrollment_dicts.append(
-        dict(
-            expire_at=now + timedelta(seconds=1),
-            bundles=[dict(asset="image", quota=10), dict(asset="text", quota=10)],
-        )
-    )
-    enrollment_dicts.append(
-        dict(
-            expire_at=now + timedelta(seconds=100),
-            bundles=[dict(asset="text", quota=10)],
-        )
-    )
+    enrollment_dicts.append({
+        "expire_at": now + timedelta(seconds=2),
+        "bundles": [{"asset": "image", "quota": 10}],
+    })
+    enrollment_dicts.append({
+        "expire_at": None,
+        "bundles": [{"asset": "image", "quota": 10}],
+    })
+    enrollment_dicts.append({
+        "expire_at": now + timedelta(seconds=11),
+        "bundles": [{"asset": "image", "quota": 10}],
+        "variant": "variant",
+    })
+    enrollment_dicts.append({
+        "expire_at": now + timedelta(seconds=1),
+        "bundles": [{"asset": "image", "quota": 10}, {"asset": "text", "quota": 10}],
+    })
+    enrollment_dicts.append({
+        "expire_at": now + timedelta(seconds=100),
+        "bundles": [{"asset": "text", "quota": 10}],
+    })
     return enrollment_dicts
 
 
-@pytest_asyncio.fixture(scope="module")
-async def enrollments(constants: StaticData, enrollment_dicts):
-    from apps.enrollment.models import Enrollment
+def uid(i: int) -> str:
+    return f"{i:032}"
 
-    uid = lambda i: uuid.UUID(f"{i:032}")
+
+@pytest_asyncio.fixture(scope="module")
+async def enrollments(
+    constants: StaticData, enrollment_dicts: list[dict]
+) -> AsyncGenerator[list[Enrollment]]:
+    from apps.enrollment.models import Enrollment
 
     now = datetime.now()
 
@@ -130,7 +125,10 @@ async def enrollments(constants: StaticData, enrollment_dicts):
         enrollments = []
         for i, enrollment_dict in enumerate(enrollment_dicts):
             enrollment = await Enrollment.get_item(
-                uid=uid(i + 1), business_name=constants.business_name_1, user_id=None
+                uid=uid(i + 1),
+                tenant_id=constants.tenant_id_1,
+                user_id=None,
+                ignore_user_id=True,
             )
             if enrollment:
                 await enrollment.delete()
@@ -138,8 +136,8 @@ async def enrollments(constants: StaticData, enrollment_dicts):
             enrollment = Enrollment(
                 uid=uid(i + 1),
                 created_at=now - timedelta(seconds=2),
-                business_name=constants.business_name_1,
-                user_id=uuid.UUID(constants.user_id_1_1),
+                tenant_id=constants.tenant_id_1,
+                user_id=constants.user_id_1_1,
                 status="active",
                 price=0,
                 **enrollment_dict,
@@ -151,41 +149,8 @@ async def enrollments(constants: StaticData, enrollment_dicts):
 
         traceback_str = "".join(traceback.format_tb(e.__traceback__))
 
-        logging.error(f"create base enrollments: \n{traceback_str}\n{e}")
+        logging.exception("create base enrollments: \n%s", traceback_str)
     yield enrollments
 
     for enrollment in enrollments:
         await enrollment.delete()
-
-
-@pytest_asyncio.fixture(scope="session")
-async def business(constants: StaticData):
-    data = dict(
-        name=StaticData.business_name_1,
-        domain="test.uln.me",
-        user_id=StaticData.user_id_1_1,
-        uid=StaticData.business_id_1,
-    )
-    bus = await Business.get_by_origin(data["domain"])
-
-    yield bus
-
-
-@pytest_asyncio.fixture(scope="session")
-async def access_token_business():
-    usso_session = UssoSession(
-        usso_base_url="https://sso.uln.me",
-        usso_api_key=StaticData.usso_api_key,
-        user_id=StaticData.user_id_1_1,
-    )
-    return usso_session.access_token
-
-
-@pytest_asyncio.fixture(scope="session")
-async def access_token_user():
-    usso_session = UssoSession(
-        usso_base_url="https://sso.uln.me",
-        usso_api_key=StaticData.usso_api_key,
-        user_id=StaticData.user_id_1_2,
-    )
-    return usso_session.access_token

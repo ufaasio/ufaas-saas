@@ -1,38 +1,36 @@
-import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
+
+from fastapi_mongo_base.core.exceptions import BaseHTTPException
 
 from apps.enrollment.models import Enrollment
 from apps.enrollment.schemas import AcquisitionType, Bundle, FreemiumQuota
 from apps.enrollment.services import borrow_enrollment, get_active_enrollments
-from core.exceptions import BaseHTTPException
 
 from .models import Usage
 from .schemas import UsageConsumption
 
 
 async def get_or_create_freemium_enrollment(
-    business_name: str, user_id: uuid.UUID, freemium_quotas: FreemiumQuota
+    tenant_id: str, user_id: str, freemium_quotas: FreemiumQuota
 ) -> Enrollment:
     now = datetime.now()
     # Check if the user has an active freemium enrolment
-    freemium_enrollment = await Enrollment.find_one(
-        {
-            "business_name": business_name,
-            "user_id": user_id,
-            "acquisition_type": "freemium",
-            "status": "active",
-            "starte_at": {"$lte": now},
-            "expire_at": {"$gt": now},  # Still active for the current period
-        }
-    )
+    freemium_enrollment = await Enrollment.find_one({
+        "tenant_id": tenant_id,
+        "user_id": user_id,
+        "acquisition_type": "freemium",
+        "status": "active",
+        "starte_at": {"$lte": now},
+        "expire_at": {"$gt": now},  # Still active for the current period
+    })
 
     if freemium_enrollment:
         return freemium_enrollment
 
     freemium_enrollment = Enrollment(
         user_id=user_id,
-        business_name=business_name,
+        tenant_id=tenant_id,
         acquisition_type=AcquisitionType.freemium,
         status="active",
         start_at=now,
@@ -44,19 +42,25 @@ async def get_or_create_freemium_enrollment(
     return freemium_enrollment
 
 
-async def get_freemium_quota(business_name):
+async def get_freemium_quota(tenant_id: str) -> object:  # noqa: RUF029
     return None
     FreemiumQuota(bundles=[Bundle(asset="token", quota=20)], days=1, variant=None)
 
 
-async def use_freemium_quota(business_name, user_id, asset, amount, variant=None):
-    freemium_quota = await get_freemium_quota(business_name)
+async def use_freemium_quota(
+    tenant_id: str,
+    user_id: str,
+    asset: str,
+    amount: Decimal,
+    variant: str | None = None,
+) -> None:
+    freemium_quota = await get_freemium_quota(tenant_id)
     if freemium_quota is None:
         return
 
     # Step 1: Get or create freemium enrolment
     freemium_enrollment: Enrollment = await get_or_create_freemium_enrollment(
-        business_name=business_name,
+        tenant_id=tenant_id,
         user_id=user_id,
         asset=asset,
         freemium_quota=freemium_quota,
@@ -72,14 +76,17 @@ async def use_freemium_quota(business_name, user_id, asset, amount, variant=None
     return
 
 
-async def use_enrollment_quota(enrollment: Enrollment, asset: str, amount: Decimal):
+async def use_enrollment_quota(
+    enrollment: Enrollment, asset: str, amount: Decimal
+) -> tuple[Enrollment, Decimal, list[Bundle]]:
     """
     Use a specified quota from the enrollment's leftover bundles for a given asset.
 
     :param enrollment: The enrollment object containing the bundles.
     :param asset: The asset for which quota is being consumed.
     :param amount: The amount of quota to consume.
-    :return: A tuple with the updated enrollment, the amount used, and the updated leftover bundles.
+    :return: A tuple with the updated enrollment, the amount used,
+    and the updated leftover bundles.
     """
     # Retrieve the leftover bundles associated with the enrollment
     leftover_bundles = await enrollment.get_leftover_bundles()
@@ -96,29 +103,31 @@ async def use_enrollment_quota(enrollment: Enrollment, asset: str, amount: Decim
 
     matching_bundle = leftover_bundles[matching_bundle_index]
 
-    # If the bundle's quota is larger than the amount to use, deduct the amount and return
+    # If the bundle's quota is larger than the amount to use,
+    # deduct the amount and return
     if matching_bundle.quota >= amount:
         matching_bundle.quota -= amount
         return enrollment, amount, leftover_bundles
 
-    # If the bundle's quota is less than or equal to the amount, use the full bundle and remove it
+    # If the bundle's quota is less than or equal to the amount,
+    # use the full bundle and remove it
     leftover_bundles.pop(matching_bundle_index)
     return enrollment, matching_bundle.quota, leftover_bundles
 
 
 async def select_enrollment(
-    business_name: str,
-    user_id: uuid.UUID,
+    tenant_id: str,
+    user_id: str,
     asset: str,
     amount: Decimal = Decimal(1),
-    variant: str = None,
-    enrollment_id: uuid.UUID = None,
+    variant: str | None = None,
+    enrollment_id: str | None = None,
 ) -> tuple[list[tuple[Enrollment, Decimal]], Decimal]:
     residual = amount
     selected_enrollments = []
 
     # freemium = await use_freemium_quota(
-    #     business_name=business_name,
+    #     tenant_id=tenant_id,
     #     user_id=user_id,
     #     asset=asset,
     #     amount=amount,
@@ -132,12 +141,16 @@ async def select_enrollment(
     #     residual -= freemium_quota
 
     active_enrollments = await get_active_enrollments(
-        business_name=business_name,
+        tenant_id=tenant_id,
         user_id=user_id,
         asset=asset,
         variant=variant,
         enrollment_id=enrollment_id,
     )
+
+    import logging
+
+    logging.info("%s\n%s", datetime.now(), Enrollment.summaries(active_enrollments))
 
     for enrollment in active_enrollments:
         using = await use_enrollment_quota(
@@ -156,17 +169,17 @@ async def select_enrollment(
 
 
 async def create_usage(
-    business_name: str,
-    user_id: uuid.UUID,
+    tenant_id: str,
+    user_id: str,
     asset: str,
     amount: Decimal = Decimal(1),
-    variant: str = None,
-    enrollment_id: uuid.UUID = None,
-    meta_data: dict = None,
+    variant: str | None = None,
+    enrollment_id: str | None = None,
+    meta_data: dict | None = None,
     borrow: bool = False,
-):
+) -> Usage:
     enrollment_quotas, residual = await select_enrollment(
-        business_name=business_name,
+        tenant_id=tenant_id,
         user_id=user_id,
         asset=asset,
         amount=amount,
@@ -178,11 +191,13 @@ async def create_usage(
         raise BaseHTTPException(
             status_code=402,
             error="insufficient_enrollment",
-            message="Not enough available resources in active enrollments for the usage",
+            message=(
+                "Not enough available resources in active enrollments for the usage"
+            ),
         )
     elif borrow and residual > 0:
         borrowed_enrollment = await borrow_enrollment(
-            business_name, user_id, asset, residual, variant
+            tenant_id, user_id, asset, residual, variant
         )
         enrollment_quotas.append((borrowed_enrollment, residual, []))
 
@@ -204,7 +219,7 @@ async def create_usage(
         consumptions.append(consumption)
 
     item = Usage(
-        business_name=business_name,
+        tenant_id=tenant_id,
         user_id=user_id,
         asset=asset,
         amount=quota,

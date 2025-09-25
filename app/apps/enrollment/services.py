@@ -1,56 +1,60 @@
-import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
+
+from pymongo import ASCENDING, DESCENDING
 
 from apps.config.models import Configuration
 from apps.enrollment.models import Enrollment
 from apps.enrollment.schemas import AcquisitionType, Bundle
-from pymongo import ASCENDING, DESCENDING
 
 
 async def get_active_enrollments(
-    business_name: str,
-    user_id: uuid.UUID,
+    tenant_id: str,
+    user_id: str,
     asset: str,
-    variant: str = None,
-    enrollment_id: uuid.UUID = None,
+    variant: str | None = None,
+    enrollment_id: str | None = None,
 ) -> list[Enrollment]:
     base_query = Enrollment.get_active_enrollments_base_query(
-        business_name=business_name,
+        tenant_id=tenant_id,
         user_id=user_id,
         asset=asset,
         variant=variant,
         enrollment_id=enrollment_id,
     )
-    base_query.append(
-        {
-            "$or": [
-                {"variant": None},  # variant is None
-                {"variant": variant},  # or variant matches given variant
-            ]
-        },
-    )
 
     pipeline = [
-        {"$match": {"$and": base_query}},
+        {"$match": base_query},
         {
             "$addFields": {
-                "expire_at_null": {
-                    "$cond": {
-                        "if": {"$eq": ["$expire_at", None]},
-                        "then": 1,
-                        "else": 0,
-                    }
-                }
+                "expiry_sort": {"$ifNull": ["$expire_at", datetime(9999, 12, 31)]}
             }
         },
-        {
-            "$sort": {
-                "variant": DESCENDING,  # Sort by variant
-                "expire_at_null": ASCENDING,  # Sort nulls last (1 for null, 0 for non-null)
-                "expire_at": ASCENDING,  # Sort by expire_at for non-null values
-            }
-        },
+        {"$sort": {"variant": DESCENDING, "expiry_sort": ASCENDING}},
+        # {
+        #     "$addFields": {
+        #         "expire_at_null": {
+        #             "$cond": {
+        #                 "if": {"$eq": ["$expire_at", None]},
+        #                 "then": 1,
+        #                 "else": 0,
+        #             }
+        #         }
+        #     }
+        # },
+        # {
+        #     "$sort": {
+        #         "variant": DESCENDING,  # Sort by variant
+        #         # Sort nulls last (1 for null, 0 for non-null)
+        #         "expire_at_null": ASCENDING,
+        #         "expire_at": ASCENDING,  # Sort by expire_at for non-null values
+        #     }
+        # },
     ]
+
+    import logging
+
+    logging.info(pipeline)
 
     # pipeline_result: list[dict] = await Enrollment.aggregate(pipeline).to_list()
     active_enrollments = [
@@ -81,14 +85,20 @@ async def get_active_enrollments(
     # )
 
 
-async def borrow_enrollment(business_name, user_id, asset, amount, variant):
+async def borrow_enrollment(
+    tenant_id: str,
+    user_id: str,
+    asset: str,
+    amount: Decimal,
+    variant: str | None = None,
+) -> Enrollment:
     now = datetime.now() - timedelta(minutes=1)
-    config = (await Configuration.get_config(business_name)) or Configuration(
-        business_name=business_name
+    config = (await Configuration.get_config(tenant_id)) or Configuration(
+        tenant_id=tenant_id
     )
     borrowed_enrollment = Enrollment(
         user_id=user_id,
-        business_name=business_name,
+        tenant_id=tenant_id,
         acquisition_type=AcquisitionType.borrowed,
         status="active",
         start_at=now,

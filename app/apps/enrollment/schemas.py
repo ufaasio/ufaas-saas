@@ -1,10 +1,9 @@
-import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import Enum
-from typing import Literal
+from enum import StrEnum
+from typing import Literal, Self
 
-from fastapi_mongo_base.schemas import BusinessOwnedEntitySchema
+from fastapi_mongo_base.schemas import TenantUserEntitySchema
 from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -19,11 +18,12 @@ class Bundle(BaseModel):
     model_config = ConfigDict(allow_inf_nan=True)
 
     @field_validator("quota", mode="before")
-    def validate_quota(cls, value):
+    @classmethod
+    def validate_quota(cls, value: Decimal) -> Decimal:
         return decimal_amount(value)
 
 
-class AcquisitionType(str, Enum):
+class AcquisitionType(StrEnum):
     trial = "trial"
     # credit = "credit"
     purchased = "purchased"
@@ -37,19 +37,19 @@ class AcquisitionType(str, Enum):
     postpaid = "postpaid"
 
     @classmethod
-    def normal_types(cls):
+    def normal_types(cls) -> list[str]:
         return [
             cls.trial,
             cls.purchased,
             cls.gifted,
             cls.promotion,
-            cls.borrowed,
+            # cls.borrowed,
             cls.postpaid,
         ]
 
 
 class EnrollmentCreateSchema(BaseModel):
-    user_id: uuid.UUID
+    user_id: str
     bundles: list[Bundle]
 
     price: Decimal = Decimal(0)
@@ -68,29 +68,31 @@ class EnrollmentCreateSchema(BaseModel):
     model_config = ConfigDict(allow_inf_nan=True)
 
     @model_validator(mode="after")
-    def validate_duration(cls, data: "EnrollmentCreateSchema"):
-        if data.expire_at and data.duration:
+    def validate_duration(self) -> Self:
+        if self.expire_at and self.duration:
             raise ValueError(
                 "Only one of expire_at or duration_days should be provided"
             )
-        if data.duration:
-            data.expire_at = data.start_at + timedelta(days=data.duration)
-            # data.duration = None
+        if self.duration:
+            self.expire_at = self.start_at + timedelta(days=self.duration)
+            # self.duration = None
 
-        return data
+        return self
 
     @field_validator("price", mode="before")
-    def validate_price(cls, value):
+    @classmethod
+    def validate_price(cls, value: Decimal) -> Decimal:
         return decimal_amount(value)
 
     @field_validator("bundles", mode="after")
-    def validate_bundles(cls, value: list[Bundle]):
+    @classmethod
+    def validate_bundles(cls, value: list[Bundle]) -> list[Bundle]:
         if not value:
             raise ValueError("Bundles are required")
         return value
 
 
-class EnrollmentSchema(EnrollmentCreateSchema, BusinessOwnedEntitySchema):
+class EnrollmentSchema(EnrollmentCreateSchema, TenantUserEntitySchema):
     # price: Decimal = Decimal(0)
     # acquisition_type: AcquisitionType = AcquisitionType.purchased
     # invoice_id: str | None = None
@@ -106,16 +108,32 @@ class EnrollmentSchema(EnrollmentCreateSchema, BusinessOwnedEntitySchema):
     paid_at: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_duration(cls, data: "EnrollmentSchema"):
-        return data
+    def validate_duration(self) -> Self:
+        return self
 
     @model_validator(mode="after")
-    def validate_due_date(cls, data: "EnrollmentSchema"):
-        if data.acquisition_type == AcquisitionType.borrowed and not data.due_date:
+    def validate_due_date(self) -> Self:
+        if self.acquisition_type == AcquisitionType.borrowed and not self.due_date:
             raise ValueError("Due date must be provided for borrowed acquisitions")
-        if data.acquisition_type == AcquisitionType.borrowed:
-            data.paid_at = False if data.paid_at is None else data.paid_at
-        return data
+        if self.acquisition_type == AcquisitionType.borrowed:
+            self.paid_at = False if self.paid_at is None else self.paid_at
+        return self
+
+    def summary(self, tabs: int = 0) -> str:
+        now = datetime.now()
+        exp = (self.expire_at - now).seconds if self.expire_at else "inf"
+        s = f"{'\t' * tabs}{self.uid}: ({self.variant}) {exp} ["
+        for b in self.bundles:
+            s += f"({b.asset}: {b.quota}) "
+        s += "]\n"
+        return s
+
+    @classmethod
+    def summaries(cls, enrollments: list[Self], tabs: int = 0) -> str:
+        s = ""
+        for e in enrollments:
+            s += e.summary(tabs + 1)
+        return s
 
 
 class EnrollmentDetailSchema(EnrollmentSchema):
@@ -143,7 +161,7 @@ class FreemiumQuota(BaseModel):
 
 
 class QuotasResponseSchema(BaseModel):
-    user_id: uuid.UUID | None = None
+    user_id: str | None = None
     asset: str
     quota: Decimal
     unit: str | None = None

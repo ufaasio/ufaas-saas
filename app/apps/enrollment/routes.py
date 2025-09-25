@@ -1,12 +1,11 @@
 import logging
-import uuid
 from datetime import datetime
 
 from fastapi import Query, Request
 from fastapi_mongo_base.schemas import PaginatedResponse
+from fastapi_mongo_base.utils import usso_routes
+
 from server.config import Settings
-from ufaas_fastapi_business.core.exceptions import AuthorizationException
-from ufaas_fastapi_business.routes import AbstractAuthRouter
 
 from .models import Enrollment
 from .schemas import (
@@ -18,21 +17,19 @@ from .schemas import (
 )
 
 
-class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
-    def __init__(self):
-        super().__init__(
-            model=Enrollment, schema=EnrollmentDetailSchema, user_dependency=None
-        )
+class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
+    model = Enrollment
+    schema = EnrollmentDetailSchema
 
-    def config_schemas(self, schema, **kwargs):
+    def config_schemas(self, schema: type, **kwargs: object) -> None:
         super().config_schemas(schema, **kwargs)
         self.delete_response_schema = EnrollmentSchema
         self.quotas_response_schema = QuotasResponseSchema
 
-    def config_routes(self, **kwargs):
+    def config_routes(self, **kwargs: object) -> None:
         super().config_routes(**kwargs)
         self.router.add_api_route(
-            f"/quotas",
+            "/quotas",
             self.quotas,
             methods=["GET"],
             response_model=self.quotas_response_schema,
@@ -43,88 +40,79 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         self,
         request: Request,
         asset: str,
-        user_id: uuid.UUID = None,
-        variant: str = None,
-    ):
+        user_id: str | None = None,
+        variant: str | None = None,
+    ) -> QuotasResponseSchema:
         """
         Retrieve the total quotas of an asset for a user
         """
-        auth = await self.get_auth(request)
-        if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
-            raise AuthorizationException("User cannot list other user's enrollment")
+        user = await self.get_user(request)
 
         overdue_enrollments = await Enrollment.overdue_enrollments(
-            auth.business.name, user_id
+            user.tenant_id, user_id
         )
 
-        logging.info(f"overdue_enrollments: {overdue_enrollments}, {asset}, {variant}")
+        logging.info(
+            "overdue_enrollments: %s, %s, %s", overdue_enrollments, asset, variant
+        )
 
         quotas = await Enrollment.quotas(
-            business_name=auth.business.name,
-            user_id=auth.user_id,
+            tenant_id=user.tenant_id,
+            user_id=user.uid,
             asset=asset,
             variant=variant,
         )
 
-        logging.info(f"{quotas=}, {asset=}, {variant=} {auth.user_id=}")
+        logging.info("%s %s %s %s %s", quotas, asset, variant, user.uid, user.tenant_id)
 
-        return QuotasResponseSchema(
-            **{
-                "user_id": auth.user_id,
-                "quota": quotas if not overdue_enrollments else 0,
-                "overdue": bool(overdue_enrollments),
-                "asset": asset,
-                "variant": variant,
-                "_quota": quotas,
-            }
-        )
+        return QuotasResponseSchema(**{
+            "user_id": user.uid,
+            "quota": quotas if not overdue_enrollments else 0,
+            "overdue": bool(overdue_enrollments),
+            "asset": asset,
+            "variant": variant,
+            "_quota": quotas,
+        })
 
     async def list_items(
         self,
         request: Request,
         offset: int = Query(0, ge=0),
         limit: int = Query(10, ge=0, le=Settings.page_max_limit),
-        user_id: uuid.UUID = None,
-        asset: str = None,
-        variant: str = None,
+        user_id: str | None = None,
+        asset: str | None = None,
+        variant: str | None = None,
         is_valid: bool = True,
-        created_at_from: datetime = None,
-        created_at_to: datetime = None,
-        start_at_from: datetime = None,
-        start_at_to: datetime = None,
-        expire_at_from: datetime = None,
-        expire_at_to: datetime = None,
-        due_date_from: datetime = None,
-        due_date_to: datetime = None,
-        paid_at_from: datetime = None,
-        paid_at_to: datetime = None,
-    ):
+        created_at_from: datetime | None = None,
+        created_at_to: datetime | None = None,
+        start_at_from: datetime | None = None,
+        start_at_to: datetime | None = None,
+        expire_at_from: datetime | None = None,
+        expire_at_to: datetime | None = None,
+        due_date_from: datetime | None = None,
+        due_date_to: datetime | None = None,
+        paid_at_from: datetime | None = None,
+        paid_at_to: datetime | None = None,
+    ) -> PaginatedResponse[EnrollmentDetailSchema]:
         """
         Retrieve a list of enrollments with pagination.
 
         Args:
 
             offset (int, optional): The offset value for pagination. Defaults to 0.
-            limit (int, optional): The maximum number of items to retrieve. Defaults to 10.
+            limit (int, optional): The maximum number of items to retrieve.
+                Defaults to 10.
 
         Returns:
 
-            PaginatedResponse: The paginated response containing the items, offset, limit, and total count.
+            PaginatedResponse: The paginated response containing the items,
+                offset, limit, and total count.
         """
-        auth = await self.get_auth(request)
-        if auth.issuer_type == "User" and user_id and user_id != auth.user_id:
-            raise AuthorizationException("User cannot list other user's enrollment")
-
-        # logging.info(
-        #     f"List items: {auth.user_id}, {auth.business.name}, "
-        #     f"{auth.issuer_type}, {is_valid}, {asset}, {variant}, {is_valid}"
-        # )
-
-        items, total = await self.model.list_total_combined(
-            user_id=auth.user_id,
-            business_name=auth.business.name,
+        return await self._list_items(
+            request=request,
             offset=offset,
             limit=limit,
+            user_id=user_id,
             asset=asset,
             variant=variant,
             is_valid=is_valid,
@@ -139,6 +127,32 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             paid_at_from=paid_at_from,
             paid_at_to=paid_at_to,
         )
+
+    async def _list_items(
+        self,
+        request: Request,
+        offset: int = 0,
+        limit: int = 10,
+        **kwargs: object,
+    ) -> PaginatedResponse[EnrollmentDetailSchema]:
+        user = await self.get_user(request)
+        limit = max(1, min(limit, Settings.page_max_limit))
+
+        filters = self.get_list_filter_queries(user=user)
+        if filters.get("__deny__"):
+            return PaginatedResponse(
+                items=[],
+                total=0,
+                offset=offset,
+                limit=limit,
+            )
+
+        items, total = await self.model.list_total_combined(
+            offset=offset,
+            limit=limit,
+            tenant_id=user.tenant_id,
+            **(kwargs | filters),
+        )
         items_in_schema = [
             self.list_item_schema(
                 **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
@@ -146,21 +160,20 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             for item in items
         ]
 
-        # logging.info(
-        #     f"List items: {len(items_in_schema)}, {offset}, {limit}, {total}"
-        # )
-
         return PaginatedResponse(
-            items=items_in_schema, offset=offset, limit=limit, total=total
+            items=items_in_schema,
+            total=total,
+            offset=offset,
+            limit=limit,
         )
 
-    async def retrieve_item(self, request: Request, uid: uuid.UUID):
+    async def retrieve_item(self, request: Request, uid: str) -> EnrollmentDetailSchema:
         """
         Retrieve an enrollment with the given UID.
 
         Args:
 
-            uid (uuid.UUID): The UID of the item to retrieve.
+            uid: The UID of the item to retrieve.
 
         Returns:
 
@@ -171,26 +184,40 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
-    async def create_item(self, request: Request, data: EnrollmentCreateSchema):
+    async def create_item(
+        self, request: Request, data: EnrollmentCreateSchema
+    ) -> EnrollmentDetailSchema:
         """
 
         Create an enrollment item.
 
         Args:
 
-            - user_id: uuid.UUID, owner of the enrollment
+            - user_id: str, owner of the enrollment
             - price: Decimal, price of the enrollment
             - invoice_id: str | None, invoice id of the enrollment if any
-            - start_at: datetime, start date of the enrollment, default set now if not provided
-            - expire_at: datetime | None, expiration date of the enrollment for the selected bundles, default None
+            - start_at: datetime, start date of the enrollment,
+                        default set now if not provided
+            - expire_at: datetime | None, expiration date of the enrollment
+                         for the selected bundles, default None
             - duration: int | None, duration of the enrollment in days, default None
-            - status: "active" | "inactive", the status of the enrollment, default "active"
-            - bundles: list[Bundle], list of bundles that are included in the enrollment. Each bundle should have a asset, quota, and unit.
-                asset: str, the asset name (For example, "Storage" in storage service, "Tokens" in LLM API service, ...)
+            - status: "active" | "inactive", the status of the enrollment,
+                      default "active"
+            - bundles: list[Bundle], list of bundles that are included in the enrollment
+                       Each bundle should have a asset, quota, and unit.
+                asset: str, the asset name (For example, "Storage" in storage service,
+                       "Tokens" in LLM API service, ...)
                 quota: Decimal, the quota of the asset
-                unit: str | None, the unit of the quota (For example, "GB" in storage service, "Tokens" in LLM API service, ...) if any
-            - variant: str | None, the variant limitation of the enrollment. For example, "car" category in a classified advertisements service. For normal enrollment, it would be None and it is not to be provided.
-            - meta_data: dict | None = None, additional metadata for the enrollment that will be stored as a dictionary.
+                unit: str | None, the unit of the quota
+                      (
+                        For example, "GB" in storage service,
+                        "Tokens" in LLM API service, ...
+                      ) if any
+            - variant: str | None, the variant limitation of the enrollment.
+                    For example, "car" category in a classified advertisements service.
+                    For normal enrollment, it would be None and it is not to be provided
+            - meta_data: dict | None = None, additional metadata for the enrollment
+                    that will be stored as a dictionary.
 
         Returns:
 
@@ -198,14 +225,11 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
 
         Raises:
 
-            - AuthorizationException: If the user is not authorized to create an enrollment.
+            - AuthorizationException:
+                If the user is not authorized to create an enrollment.
         """
         # only business can create enrollment
-        logging.info(f"create_item: {request.headers} {data}")
-        auth = await self.get_auth(request)
-        if auth.issuer_type == "User":
-            # TODO check scopes
-            raise AuthorizationException("User cannot create enrollment")
+        user = await self.get_user(request)
 
         data: dict = data.model_dump()
         data.pop("user_id", None)
@@ -213,8 +237,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         logging.info(data)
 
         item = self.model(
-            business_name=auth.business.name,
-            user_id=auth.user_id if auth.user_id else auth.user.uid,
+            tenant_id=user.tenant_id,
+            user_id=user.uid,
             **data,
         )
         await item.save()
@@ -223,8 +247,8 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
         )
 
     async def update_item(
-        self, request: Request, uid: uuid.UUID, data: EnrollmentUpdateSchema
-    ):
+        self, request: Request, uid: str, data: EnrollmentUpdateSchema
+    ) -> EnrollmentDetailSchema:
         item: Enrollment = await super().update_item(
             request, uid, data.model_dump(exclude_unset=True)
         )
@@ -232,7 +256,7 @@ class EnrollmentRouter(AbstractAuthRouter[Enrollment, EnrollmentDetailSchema]):
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
-    async def delete_item(self, request: Request, uid: uuid.UUID):
+    async def delete_item(self, request: Request, uid: str) -> EnrollmentDetailSchema:
         return await super().delete_item(request, uid)
 
 

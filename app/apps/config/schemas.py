@@ -1,10 +1,9 @@
-import uuid
 
-from fastapi_mongo_base.schemas import BusinessEntitySchema
+from fastapi_mongo_base.schemas import TenantScopedEntitySchema
 
 
-class Config(BusinessEntitySchema):
-    wallet_id: uuid.UUID | None = None
-    income_wallet_id: uuid.UUID | None = None
+class Config(TenantScopedEntitySchema):
+    wallet_id: str | None = None
+    income_wallet_id: str | None = None
 
     default_borrow_period: int = 0

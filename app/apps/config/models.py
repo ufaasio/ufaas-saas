@@ -1,15 +1,11 @@
-from fastapi_mongo_base.models import BusinessEntity
-from pymongo import ASCENDING, IndexModel
+from typing import Self
+
+from fastapi_mongo_base.models import TenantScopedEntity
 
 from .schemas import Config
 
 
-class Configuration(Config, BusinessEntity):
-    class Settings:
-        indexes = BusinessEntity.Settings.indexes + [
-            IndexModel([("business_name", ASCENDING)], unique=True)
-        ]
-
+class Configuration(Config, TenantScopedEntity):
     @classmethod
-    async def get_config(cls, business_name: str) -> "Configuration":
-        return await cls.find_one({"business_name": business_name})
+    async def get_config(cls, tenant_id: str) -> Self:
+        return await cls.find_one({"tenant_id": tenant_id})

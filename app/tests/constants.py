@@ -7,18 +7,16 @@ dotenv.load_dotenv()
 
 
 class StaticData(metaclass=Singleton):
-    business_name_1 = "ufaas test"
-    business_id_1 = "00000000-0000-0000-0001-000000000000"
+    tenant_id_1 = "0197f464-46c8-72a1-8b23-0819b8622a0c"
     business_domain_1 = "test.uln.me"
 
-    business_name_2 = "business_2"
-    business_id_2 = "00000000-0000-0000-0002-000000000000"
+    tenant_id_2 = "business_2"
 
     user_id_1_1 = (
-        "3fd73ffd-1e0a-4096-adbb-b11bf969cf2b"  # "00000001-0000-0000-0001-000000000001"
+         "00000001-0000-0000-0001-000000000001"
     )
     user_id_1_2 = (
-        "61337f88-71c8-4f8e-b6f3-f39448d0b1a4"  # "00000001-0000-0000-0001-000000000002"
+         "00000001-0000-0000-0001-000000000002"
     )
     user_id_2_1 = "00000001-0000-0000-0002-000000000001"
     user_id_2_2 = "00000001-0000-0000-0002-000000000002"
