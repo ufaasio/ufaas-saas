@@ -27,7 +27,6 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         self.quotas_response_schema = QuotasResponseSchema
 
     def config_routes(self, **kwargs: object) -> None:
-        super().config_routes(**kwargs)
         self.router.add_api_route(
             "/quotas",
             self.quotas,
@@ -35,6 +34,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
             response_model=self.quotas_response_schema,
             status_code=200,
         )
+        super().config_routes(**kwargs)
 
     async def quotas(
         self,
