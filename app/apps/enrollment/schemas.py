@@ -13,7 +13,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 class Bundle(BaseModel):
     asset: str
     quota: Decimal
+    order: Literal[0, 1, 2] = 1
     unit: str | None = None
+    meta_data: dict | None = None
 
     model_config = ConfigDict(allow_inf_nan=True)
 

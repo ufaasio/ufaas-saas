@@ -58,7 +58,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
 
         quotas = await Enrollment.quotas(
             tenant_id=user.tenant_id,
-            user_id=user.uid,
+            user_id=user_id or user.uid,
             asset=asset,
             variant=variant,
         )
@@ -231,15 +231,17 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         # only business can create enrollment
         user = await self.get_user(request)
 
-        data: dict = data.model_dump()
-        data.pop("user_id", None)
-
-        logging.info(data)
+        if data.user_id:
+            await self.authorize(
+                action="create",
+                user=user,
+                filter_data=data.model_dump(exclude_none=True),
+            )
 
         item = self.model(
             tenant_id=user.tenant_id,
-            user_id=user.uid,
-            **data,
+            user_id=data.user_id or user.uid,
+            **data.model_dump(exclude=["user_id"]),
         )
         await item.save()
         return self.schema(
