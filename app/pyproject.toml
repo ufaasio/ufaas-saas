@@ -16,7 +16,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "beanie<2",
+    # "beanie<2",
     "ipython>=9.4.0",
     "mongomock-motor>=0.0.36",
     "mypy>=1.17.0",
@@ -25,6 +25,7 @@ dev = [
     "pytest-cov>=6.2.1",
     "pytest-timeout>=2.4.0",
     "ruff>=0.12.5",
+    "ty>=0.0.1a21",
 ]
 
 [tool.ruff]
