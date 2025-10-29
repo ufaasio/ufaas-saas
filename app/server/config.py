@@ -17,7 +17,7 @@ class Settings(config.Settings):
     base_path: str = "/api/saas/v1"
 
     redis_uri: str = os.getenv("REDIS_URI", default="redis://redis:6379")
-    base_usso_url: str = os.getenv("BASE_USSO_URL", default="https://usso.uln.me")
+    usso_base_url: str = os.getenv("USSO_BASE_URL", default="https://usso.uln.me")
     accounting_service_url: str = os.getenv(
         "ACCOUNTING_SERVICE_URL", default="https://wallets.uln.me"
     )
