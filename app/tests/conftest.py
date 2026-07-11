@@ -30,8 +30,7 @@ def setup_debugpy() -> None:
 def mongo_client() -> AsyncGenerator[object]:
     from mongomock_motor import AsyncMongoMockClient
 
-    mongo_client = AsyncMongoMockClient()
-    yield mongo_client
+    yield AsyncMongoMockClient()
 
 
 # Async setup function to initialize the database with Beanie

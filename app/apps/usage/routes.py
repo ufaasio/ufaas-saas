@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from fastapi import Request
-from fastapi_mongo_base.core.exceptions import BaseHTTPException
+from fastapi_mongo_base.errors import NotFoundError
 from fastapi_mongo_base.schemas import PaginatedResponse
 from fastapi_mongo_base.utils import usso_routes
 
@@ -184,10 +184,13 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
         )
 
         if not item:
-            raise BaseHTTPException(
-                status_code=404,
-                error="item_not_found",
-                message=f"{self.model.__name__.capitalize()} not found",
+            raise NotFoundError(
+                error_code="usage_not_found",
+                detail=f"{self.model.__name__.capitalize()} not found",
+                message={
+                    "en": f"{self.model.__name__.capitalize()} not found",
+                    "fa": f"{self.model.__name__.capitalize()} یافت نشد",
+                },
             )
 
         cancel_consumptions = []

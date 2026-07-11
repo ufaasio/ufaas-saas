@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
-from fastapi_mongo_base.core.exceptions import BaseHTTPException
+from fastapi_mongo_base.errors import PaymentRequiredError
 
 from apps.enrollment.models import Enrollment
 from apps.enrollment.schemas import AcquisitionType, Bundle, FreemiumQuota
@@ -188,12 +188,17 @@ async def create_usage(
     )
 
     if not borrow and residual > 0:
-        raise BaseHTTPException(
-            status_code=402,
-            error="insufficient_enrollment",
-            message=(
+        raise PaymentRequiredError(
+            error_core="insufficient_enrollment",
+            detail=(
                 "Not enough available resources in active enrollments for the usage"
             ),
+            message={
+                "en": (
+                    "Not enough available resources in active enrollments for the usage"
+                ),
+                "fa": "موجودی فعال، برای استفاده مورد نظر موجود نیست",
+            },
         )
     elif borrow and residual > 0:
         borrowed_enrollment = await borrow_enrollment(
