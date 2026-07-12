@@ -48,6 +48,8 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         """
         user = await self.get_user(request)
 
+        logging.info("user: %s, user_id: %s, variant: %s", user, user_id, variant)
+
         overdue_enrollments = await Enrollment.overdue_enrollments(
             user.tenant_id, user_id
         )
