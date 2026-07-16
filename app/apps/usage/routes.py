@@ -1,3 +1,5 @@
+"""Usage API routes."""
+
 from datetime import datetime
 
 from fastapi import Request
@@ -35,12 +37,7 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
     schema = UsageSchema
 
     def config_routes(self) -> None:
-        """
-        Configures the routes for the router.
-
-        Returns:
-            None
-        """
+        """Configure the routes for the router."""
         super().config_routes(update_route=False, delete_route=False)
         self.router.add_api_route(
             "/{uid:str}/cancel",
@@ -64,12 +61,16 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
         List usages with pagination.
 
         Args:
-
-            offset (int, optional): The offset for pagination. Defaults to 0.
-            limit (int, optional): The limit for pagination. Defaults to 10.
+            request: The incoming request.
+            offset: The offset for pagination.
+            limit: The limit for pagination.
+            user_id: Filter by user ID.
+            asset: Filter by asset.
+            variant: Filter by variant.
+            created_at_from: Filter by created_at start range.
+            created_at_to: Filter by created_at end range.
 
         Returns:
-
             The list of usages.
         """
         return await self._list_items(
@@ -102,6 +103,7 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
         )
 
     async def retrieve_item(self, request: Request, uid: str) -> UsageSchema:
+        """Retrieve a usage item by UID."""
         user = await self.get_user(request)
         item = await self.get_item(uid=uid, user_id=None, tenant_id=user.tenant_id)
         await self.authorize(
@@ -118,7 +120,9 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
         Create an usage item and calculate the leftover bundles.
 
         Args:
-
+            request: The incoming request.
+            data: The usage creation data.
+            borrow: Whether to allow borrowing.
             enrollment_id: str | None, the enrollment that the usage
             is associated with. If not provided, the usage will be associated to
             the best matching enrollment.
@@ -130,7 +134,6 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
             meta_data: dict | None, the metadata of the usage.
 
         Note:
-
             If not provided, the usage will be associated with
             the best matching enrollment. The best matching is determined
             by the following order:
@@ -141,7 +144,6 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
             The system will use the enrollments one by one until the amount is used up.
 
         Returns:
-
             list[dict]: The list of created usage items. Each related to an enrollment.
 
         Raises:
@@ -170,11 +172,10 @@ class UsageRouter(usso_routes.AbstractTenantUSSORouter):
         Cancel a usage item.
 
         Args:
-
+            request: The incoming request.
             uid: The uid of the usage.
 
         Returns:
-
             The canceled usage.
         """
         user = await self.get_user(request)

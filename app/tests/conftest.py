@@ -1,3 +1,5 @@
+"""Test configuration and fixtures."""
+
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -15,19 +17,23 @@ from server.config import Settings
 from server.server import app as fastapi_app
 from tests.constants import StaticData
 
+logger = logging.getLogger("tests.conftest")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_debugpy() -> None:
+    """Set up debugpy for remote debugging."""
     if os.getenv("DEBUGPY", "False").lower() in ("true", "1", "yes"):
         import debugpy  # noqa: T100
 
         debugpy.listen(("127.0.0.1", 3020))  # noqa: T100
-        logging.info("Waiting for debugpy client")
+        logger.info("Waiting for debugpy client")
         debugpy.wait_for_client()  # noqa: T100
 
 
 @pytest.fixture(scope="session")
 def mongo_client() -> AsyncGenerator[object]:
+    """Fixture providing a mock MongoDB client."""
     from mongomock_motor import AsyncMongoMockClient
 
     yield AsyncMongoMockClient()
@@ -35,6 +41,7 @@ def mongo_client() -> AsyncGenerator[object]:
 
 # Async setup function to initialize the database with Beanie
 async def init_db(mongo_client: object) -> None:
+    """Initialize the database with Beanie."""
     database = mongo_client.get_database("test_db")
     await init_beanie(
         database=database,
@@ -44,12 +51,13 @@ async def init_db(mongo_client: object) -> None:
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def db(mongo_client: object) -> AsyncGenerator[None]:
+    """Fixture providing a test database."""
     Settings.config_logger()
-    logging.info("Initializing database")
+    logger.info("Initializing database")
     await init_db(mongo_client)
-    logging.info("Database initialized")
+    logger.info("Database initialized")
     yield
-    logging.info("Cleaning up database")
+    logger.info("Cleaning up database")
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -66,6 +74,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient]:
 async def authenticated_client(
     client: httpx.AsyncClient,
 ) -> AsyncGenerator[httpx.AsyncClient]:
+    """Fixture providing an authenticated HTTP client."""
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fastapi_app),
         base_url=client.base_url,
@@ -76,11 +85,13 @@ async def authenticated_client(
 
 @pytest.fixture(scope="session")
 def constants() -> StaticData:
+    """Fixture providing static test data."""
     return StaticData()
 
 
 @pytest.fixture(scope="module")
 def enrollment_dicts() -> list[dict]:
+    """Fixture providing enrollment test data."""
     now = datetime.now()
 
     enrollment_dicts = []
@@ -109,6 +120,7 @@ def enrollment_dicts() -> list[dict]:
 
 
 def uid(i: int) -> str:
+    """Generate a zero-padded UID string."""
     return f"{i:032}"
 
 
@@ -116,6 +128,7 @@ def uid(i: int) -> str:
 async def enrollments(
     constants: StaticData, enrollment_dicts: list[dict]
 ) -> AsyncGenerator[list[Enrollment]]:
+    """Fixture providing enrollment test data."""
     from apps.enrollment.models import Enrollment
 
     now = datetime.now()
@@ -148,7 +161,7 @@ async def enrollments(
 
         traceback_str = "".join(traceback.format_tb(e.__traceback__))
 
-        logging.exception("create base enrollments: \n%s", traceback_str)
+        logger.exception("create base enrollments: \n%s", traceback_str)
     yield enrollments
 
     for enrollment in enrollments:

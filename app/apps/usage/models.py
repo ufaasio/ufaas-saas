@@ -1,3 +1,5 @@
+"""Usage models."""
+
 from typing import Self
 
 from fastapi_mongo_base.models import TenantUserEntity
@@ -7,14 +9,15 @@ from .schemas import UsageSchema
 
 
 class Usage(UsageSchema, TenantUserEntity):
+    """Usage model representing resource consumption."""
+
     @classmethod
     async def get_latest_usage(cls, enrollment_id: str) -> Self:
-        # Fetch the latest usage for the given enrollment_id,
-        # sorted by the creation time in descending order
+        """Get the latest usage for a given enrollment ID."""
         usages = (
-            await cls.find({"consumptions.enrollment_id": enrollment_id})
+            await cls
+            .find({"consumptions.enrollment_id": enrollment_id})
             .sort([("created_at", DESCENDING)])
-            .to_list(1)  # Limit to the first result
+            .to_list(1)
         )
-        # Return the first usage if it exists, otherwise return None
         return usages[0] if usages else None

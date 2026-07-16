@@ -1,3 +1,5 @@
+"""Enrollment models."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Self
@@ -9,6 +11,8 @@ from .schemas import AcquisitionType, Bundle, EnrollmentSchema
 
 
 class Enrollment(EnrollmentSchema, TenantUserEntity):
+    """Enrollment model."""
+
     @classmethod
     def get_query(
         cls,
@@ -21,9 +25,10 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
         is_valid: bool = True,
         **kwargs: object,
     ) -> FindMany:
+        """Get query for enrollments."""
         if is_valid and not uid:
             return cls.find(
-                *cls.get_active_enrollments_base_query(
+                cls.get_active_enrollments_base_query(
                     tenant_id=tenant_id,
                     user_id=user_id,
                     asset=asset,
@@ -46,6 +51,7 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
         return query
 
     async def get_leftover_bundles(self) -> list[Bundle]:
+        """Get leftover bundles after usage."""
         from apps.usage.models import Usage
 
         latest_usage = await Usage.get_latest_usage(self.uid)
@@ -65,7 +71,8 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
         enrollment_id: str | None = None,
         is_deleted: bool = False,
         **kwargs: object,
-    ) -> list[dict]:
+    ) -> dict:
+        """Get base query for active enrollments."""
         now = datetime.now()
 
         base_query = {
@@ -88,8 +95,7 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
                     "$or": [
                         {"expire_at": {"$gt": now}},
                         {"expire_at": None},
-                        # اگر ممکن است فیلد وجود نداشته باشد:
-                        # {"expire_at": {"$exists": False}},
+
                     ]
                 },
                 {
@@ -113,12 +119,12 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
 
     @classmethod
     async def overdue_enrollments(cls, tenant_id: str, user_id: str) -> list[Self]:
+        """Get overdue borrowed enrollments."""
         now = datetime.now()
         return await cls.find({
             "tenant_id": tenant_id,
             "user_id": user_id,
             "acquisition_type": "borrowed",
-            # "status": "active",
             "due_date": {"$lt": now},
             "paid_at": None,
         }).to_list()
@@ -131,19 +137,13 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
         asset: str,
         variant: str | None = None,
     ) -> Decimal:
-        """
-        Retrieve the total quotas of an asset for a user
-        """
+        """Retrieve the total quotas of an asset for a user."""
         base_query = cls.get_active_enrollments_base_query(
             tenant_id=tenant_id,
             user_id=user_id,
             asset=asset,
             variant=variant,
         )
-
-        # enrollments = [
-        #     Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
-        # ]
 
         enrollments = await cls.find(base_query).to_list()
         quota = 0

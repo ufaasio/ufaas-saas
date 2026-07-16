@@ -1,3 +1,5 @@
+"""FastAPI application factory."""
+
 from fastapi import APIRouter
 from fastapi_mongo_base.core import app_factory
 
