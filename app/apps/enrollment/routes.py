@@ -74,7 +74,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         logger.info("%s %s %s %s %s", quotas, asset, variant, user.uid, user.tenant_id)
 
         return QuotasResponseSchema(**{
-            "user_id": user.uid,
+            "user_id": user_id or user.uid,
             "quota": quotas if not overdue_enrollments else 0,
             "overdue": bool(overdue_enrollments),
             "asset": asset,
@@ -261,7 +261,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
             **data.model_dump(exclude=["user_id"]),
         )
         await item.save()
-        return self.schema(
+        return self.schema.model_validate(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
