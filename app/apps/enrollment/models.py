@@ -1,3 +1,5 @@
+"""Enrollment models."""
+
 from datetime import datetime
 from decimal import Decimal
 from typing import Self
@@ -88,8 +90,6 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
                     "$or": [
                         {"expire_at": {"$gt": now}},
                         {"expire_at": None},
-                        # اگر ممکن است فیلد وجود نداشته باشد:
-                        # {"expire_at": {"$exists": False}},
                     ]
                 },
                 {
@@ -118,7 +118,6 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
             "tenant_id": tenant_id,
             "user_id": user_id,
             "acquisition_type": "borrowed",
-            # "status": "active",
             "due_date": {"$lt": now},
             "paid_at": None,
         }).to_list()
@@ -140,10 +139,6 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
             asset=asset,
             variant=variant,
         )
-
-        # enrollments = [
-        #     Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
-        # ]
 
         enrollments = await cls.find(base_query).to_list()
         quota = 0

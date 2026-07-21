@@ -1,3 +1,5 @@
+"""Usage API routes."""
+
 from datetime import datetime
 
 from fastapi import Request

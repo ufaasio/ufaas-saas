@@ -1,3 +1,5 @@
+"""Enrollment API routes."""
+
 import logging
 from datetime import datetime
 

@@ -1,3 +1,5 @@
+"""Enrollment schemas."""
+
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import StrEnum
@@ -6,8 +8,6 @@ from typing import Literal, Self
 from fastapi_mongo_base.schemas import TenantUserEntitySchema
 from fastapi_mongo_base.utils.bsontools import decimal_amount
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-# from .schemas import Bundle, EnrollmentSchema
 
 
 class Bundle(BaseModel):
@@ -27,15 +27,10 @@ class Bundle(BaseModel):
 
 class AcquisitionType(StrEnum):
     trial = "trial"
-    # credit = "credit"
     purchased = "purchased"
     gifted = "gifted"
-    # deferred = "deferred"
     promotion = "promotion"
-    # subscription = "subscription"
-    # on_demand = "on_demand"
     borrowed = "borrowed"
-    # freemium = "freemium"
     postpaid = "postpaid"
 
     @classmethod
@@ -77,7 +72,6 @@ class EnrollmentCreateSchema(BaseModel):
             )
         if self.duration:
             self.expire_at = self.start_at + timedelta(days=self.duration)
-            # self.duration = None
 
         return self
 
@@ -95,18 +89,6 @@ class EnrollmentCreateSchema(BaseModel):
 
 
 class EnrollmentSchema(EnrollmentCreateSchema, TenantUserEntitySchema):
-    # price: Decimal = Decimal(0)
-    # acquisition_type: AcquisitionType = AcquisitionType.purchased
-    # invoice_id: str | None = None
-    # start_at: datetime = Field(default_factory=datetime.now)
-    # expire_at: datetime | None = None
-    # duration: int | None = None
-    # status: Literal["active", "inactive"] = "active"
-
-    # bundles: list[Bundle]
-    # variant: str | None = None
-
-    # due_date: datetime | None = None
     paid_at: datetime | None = None
 
     @model_validator(mode="after")
@@ -145,8 +127,6 @@ class EnrollmentDetailSchema(EnrollmentSchema):
 class EnrollmentUpdateSchema(BaseModel):
     price: Decimal = Decimal(0)
     invoice_id: str | None = None
-    # start_at: datetime = Field(default_factory=datetime.now)
-    # expire_at: datetime | None = None
     status: Literal["active", "inactive"] = "active"
     acquisition_type: AcquisitionType = AcquisitionType.purchased
     meta_data: dict | None = None

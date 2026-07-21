@@ -1,3 +1,5 @@
+"""Usage services."""
+
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -42,7 +44,7 @@ async def get_or_create_freemium_enrollment(
     return freemium_enrollment
 
 
-async def get_freemium_quota(tenant_id: str) -> object:  # noqa: RUF029
+async def get_freemium_quota(tenant_id: str) -> object:  # ruff:ignore[unused-async]
     return None
     FreemiumQuota(bundles=[Bundle(asset="token", quota=20)], days=1, variant=None)
 
@@ -126,20 +128,6 @@ async def select_enrollment(
     residual = amount
     selected_enrollments = []
 
-    # freemium = await use_freemium_quota(
-    #     tenant_id=tenant_id,
-    #     user_id=user_id,
-    #     asset=asset,
-    #     amount=amount,
-    #     variant=variant,
-    # )
-    # if freemium:
-    #     freemium_enrollment, freemium_quota, leftover_bundles = freemium
-    #     selected_enrollments.append(
-    #         (freemium_enrollment, freemium_quota, leftover_bundles)
-    #     )
-    #     residual -= freemium_quota
-
     active_enrollments = await get_active_enrollments(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -205,13 +193,6 @@ async def create_usage(
             tenant_id, user_id, asset, residual, variant
         )
         enrollment_quotas.append((borrowed_enrollment, residual, []))
-
-    # if len(enrollment_quotas) == 0:
-    #     raise BaseHTTPException(
-    #         status_code=402,
-    #         error="insufficient_enrollment",
-    #         message="No enrollment is available for the usage",
-    #     )
 
     consumptions: list[Usage] = []
     for enrollment, quota, leftover_bundles in enrollment_quotas:

@@ -1,3 +1,5 @@
+"""Usage schemas."""
+
 from decimal import Decimal
 from typing import Self
 
@@ -42,18 +44,10 @@ class UsageCreateSchema(BaseModel):
 
 
 class UsageSchema(TenantUserEntitySchema):
-    # enrollment_id: str
-    # asset: str
-    # amount: Decimal
-
     consumptions: list[UsageConsumption]
     asset: str
     amount: Decimal
     variant: str | None = None
-
-    # @classmethod
-    # def search_field_set(cls) -> list[str]:
-    #     return list(set(super().search_field_set() + ["asset", "variant"]))
 
     @classmethod
     def search_exclude_set(cls) -> list[str]:

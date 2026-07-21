@@ -93,7 +93,7 @@ async def test_enrollment_endpoint_create(
     })
     response = await authenticated_client.post(
         enrollment_endpoint,
-        content=json.dumps(data, cls=json_encoder.JSONSerializer),
+        json=json.loads(json.dumps(data, cls=json_encoder.JSONSerializer)),
     )
     resp_json = response.json()
     logging.info(f"enrollment_create: {authenticated_client.base_url} {resp_json}")
