@@ -1,4 +1,4 @@
-"""Main entry point for the SaaS application."""
+"""Main entry point for the FastAPI server."""
 
 import asyncio
 import logging
@@ -12,12 +12,14 @@ from server.server import app
 
 __all__ = ["app"]
 
+logger = logging.getLogger("saas.main")
+
 
 async def main() -> None:
     module = Path(__file__).stem
     config = uvicorn.Config(
         f"{module}:app",
-        host="0.0.0.0",  # ruff:ignore[hardcoded-bind-all-interfaces]
+        host="0.0.0.0",  # noqa: S104
         port=8000,
         access_log=True,
         workers=1,
@@ -30,7 +32,7 @@ async def main() -> None:
     stop_event = asyncio.Event()
 
     def shutdown(sig: int) -> None:
-        logging.info("Received stop signal %d. Initiating graceful shutdown...", sig)
+        logger.info("Received stop signal %d. Initiating graceful shutdown...", sig)
         stop_event.set()
         server.handle_exit(sig=sig, frame=None)
 
@@ -44,7 +46,7 @@ async def main() -> None:
     await stop_event.wait()
 
     # Now gracefully shutdown server
-    logging.info("Shutdown complete.")
+    logger.info("Shutdown complete.")
 
     # Optional: wait for server task to finish if needed
     server_task.cancel()
@@ -54,5 +56,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception:
-        logging.exception("Unexpected exception occurred")
+        logger.exception("Unexpected exception occurred")
         sys.exit(1)

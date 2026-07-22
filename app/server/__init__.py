@@ -1,1 +1,1 @@
-"""server package"""
+"""Server package."""

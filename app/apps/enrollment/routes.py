@@ -18,17 +18,23 @@ from .schemas import (
     QuotasResponseSchema,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
+    """Router for enrollment CRUD operations."""
+
     model = Enrollment
     schema = EnrollmentDetailSchema
 
     def config_schemas(self, schema: type, **kwargs: object) -> None:
+        """Configure response schemas."""
         super().config_schemas(schema, **kwargs)
         self.delete_response_schema = EnrollmentSchema
         self.quotas_response_schema = QuotasResponseSchema
 
     def config_routes(self, **kwargs: object) -> None:
+        """Configure routes."""
         self.router.add_api_route(
             "/quotas",
             self.quotas,
@@ -45,16 +51,16 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         user_id: str | None = None,
         variant: str | None = None,
     ) -> QuotasResponseSchema:
-        """
-        Retrieve the total quotas of an asset for a user
-        """
+        """Retrieve the total quotas of an asset for a user."""
         user = await self.get_user(request)
+
+        logger.info("user_id: %s, variant: %s", user_id, variant)
 
         overdue_enrollments = await Enrollment.overdue_enrollments(
             user.tenant_id, user_id
         )
 
-        logging.info(
+        logger.info(
             "overdue_enrollments: %s, %s, %s", overdue_enrollments, asset, variant
         )
 
@@ -65,10 +71,10 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
             variant=variant,
         )
 
-        logging.info("%s %s %s %s %s", quotas, asset, variant, user.uid, user.tenant_id)
+        logger.info("%s %s %s %s %s", quotas, asset, variant, user.uid, user.tenant_id)
 
         return QuotasResponseSchema(**{
-            "user_id": user.uid,
+            "user_id": user_id or user.uid,
             "quota": quotas if not overdue_enrollments else 0,
             "overdue": bool(overdue_enrollments),
             "asset": asset,
@@ -100,13 +106,25 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         Retrieve a list of enrollments with pagination.
 
         Args:
-
-            offset (int, optional): The offset value for pagination. Defaults to 0.
-            limit (int, optional): The maximum number of items to retrieve.
-                Defaults to 10.
+            request: The incoming request.
+            offset: The offset value for pagination.
+            limit: The maximum number of items to retrieve.
+            user_id: Filter by user ID.
+            asset: Filter by asset.
+            variant: Filter by variant.
+            is_valid: Filter by validity status.
+            created_at_from: Filter by created_at start range.
+            created_at_to: Filter by created_at end range.
+            start_at_from: Filter by start_at start range.
+            start_at_to: Filter by start_at end range.
+            expire_at_from: Filter by expire_at start range.
+            expire_at_to: Filter by expire_at end range.
+            due_date_from: Filter by due_date start range.
+            due_date_to: Filter by due_date end range.
+            paid_at_from: Filter by paid_at start range.
+            paid_at_to: Filter by paid_at end range.
 
         Returns:
-
             PaginatedResponse: The paginated response containing the items,
                 offset, limit, and total count.
         """
@@ -174,11 +192,10 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         Retrieve an enrollment with the given UID.
 
         Args:
-
+            request: The incoming request.
             uid: The UID of the item to retrieve.
 
         Returns:
-
             Enrolment: The retrieved enrollment with the leftover bundles.
         """
         item: Enrollment = await super().retrieve_item(request, uid)
@@ -190,11 +207,11 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         self, request: Request, data: EnrollmentCreateSchema
     ) -> EnrollmentDetailSchema:
         """
-
         Create an enrollment item.
 
         Args:
-
+            request: The incoming request.
+            data: The enrollment creation data.
             - user_id: str, owner of the enrollment
             - price: Decimal, price of the enrollment
             - invoice_id: str | None, invoice id of the enrollment if any
@@ -222,11 +239,9 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
                     that will be stored as a dictionary.
 
         Returns:
-
             dict: The created enrollment item.
 
         Raises:
-
             - AuthorizationException:
                 If the user is not authorized to create an enrollment.
         """
@@ -246,13 +261,14 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
             **data.model_dump(exclude=["user_id"]),
         )
         await item.save()
-        return self.schema(
+        return self.schema.model_validate(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 
     async def update_item(
         self, request: Request, uid: str, data: EnrollmentUpdateSchema
     ) -> EnrollmentDetailSchema:
+        """Update an enrollment."""
         item: Enrollment = await super().update_item(
             request, uid, data.model_dump(exclude_unset=True)
         )
@@ -261,6 +277,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
         )
 
     async def delete_item(self, request: Request, uid: str) -> EnrollmentDetailSchema:
+        """Delete an enrollment."""
         return await super().delete_item(request, uid)
 
 

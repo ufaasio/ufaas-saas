@@ -1,1 +1,1 @@
-"""enrollment package"""
+"""Enrollment package."""

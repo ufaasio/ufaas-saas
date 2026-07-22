@@ -1,1 +1,1 @@
-"""usage package"""
+"""Usage package."""

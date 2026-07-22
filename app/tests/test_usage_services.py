@@ -1,4 +1,8 @@
+"""Usage service tests."""
+
 import asyncio
+import logging
+from datetime import datetime
 
 import pytest
 
@@ -8,11 +12,14 @@ from tests.constants import StaticData
 
 from .conftest import uid
 
+logger = logging.getLogger("tests.test_usage_services")
+
 
 @pytest.mark.asyncio
 async def test_select_enrollment_normal(
     constants: StaticData, enrollments: list[Enrollment]
 ) -> None:
+    """Test selecting a normal enrollment."""
     tenant_id = constants.tenant_id_1
     user_id = constants.user_id_1_1
     asset = "image"
@@ -27,10 +34,7 @@ async def test_select_enrollment_normal(
         variant=variant,
         enrollment_id=enrollment_id,
     )
-    import logging
-    from datetime import datetime
-
-    logging.info("%s %s", datetime.now(), enrollment_quotas)
+    logger.info("%s %s", datetime.now(), enrollment_quotas)
     assert enrollment_quotas is not None
     assert isinstance(enrollment_quotas, list)
     assert len(enrollment_quotas) == 1
@@ -43,6 +47,7 @@ async def test_select_enrollment_normal(
 async def test_select_enrollment_large(
     constants: StaticData, enrollments: list[Enrollment]
 ) -> None:
+    """Test selecting a large enrollment."""
     enrollment_quotas, _residual = await select_enrollment(
         tenant_id=constants.tenant_id_1,
         user_id=constants.user_id_1_1,
@@ -62,6 +67,7 @@ async def test_select_enrollment_large(
 async def test_select_enrollment_large_variant(
     constants: StaticData, enrollments: list[Enrollment]
 ) -> None:
+    """Test selecting a large enrollment with a variant."""
     enrollment_quotas, _residual = await select_enrollment(
         tenant_id=constants.tenant_id_1,
         user_id=constants.user_id_1_1,
@@ -82,6 +88,7 @@ async def test_select_enrollment_large_variant(
 async def test_select_enrollment_delayed(
     constants: StaticData, enrollments: list[Enrollment]
 ) -> None:
+    """Test selecting a delayed enrollment."""
     await asyncio.sleep(2)
     enrollment_quotas, _residual = await select_enrollment(
         tenant_id=constants.tenant_id_1,

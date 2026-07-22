@@ -17,6 +17,7 @@ async def get_active_enrollments(
     variant: str | None = None,
     enrollment_id: str | None = None,
 ) -> list[Enrollment]:
+    """Get active enrollments for a user and asset."""
     base_query = Enrollment.get_active_enrollments_base_query(
         tenant_id=tenant_id,
         user_id=user_id,
@@ -35,10 +36,6 @@ async def get_active_enrollments(
         {"$sort": {"variant": DESCENDING, "expiry_sort": ASCENDING}},
     ]
 
-    import logging
-
-    logging.info(pipeline)
-
     active_enrollments = [
         Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
     ]
@@ -53,6 +50,7 @@ async def borrow_enrollment(
     amount: Decimal,
     variant: str | None = None,
 ) -> Enrollment:
+    """Create a borrowed enrollment for a user."""
     now = datetime.now() - timedelta(minutes=1)
     config = (await Configuration.get_config(tenant_id)) or Configuration(
         tenant_id=tenant_id

@@ -1,4 +1,4 @@
-"""Health check tests."""
+"""Health endpoint tests."""
 
 import httpx
 import pytest

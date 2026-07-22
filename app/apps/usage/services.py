@@ -1,5 +1,6 @@
 """Usage services."""
 
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -12,12 +13,14 @@ from apps.enrollment.services import borrow_enrollment, get_active_enrollments
 from .models import Usage
 from .schemas import UsageConsumption
 
+logger = logging.getLogger("saas.usage.services")
+
 
 async def get_or_create_freemium_enrollment(
     tenant_id: str, user_id: str, freemium_quotas: FreemiumQuota
 ) -> Enrollment:
+    """Get or create a freemium enrollment for a user."""
     now = datetime.now()
-    # Check if the user has an active freemium enrolment
     freemium_enrollment = await Enrollment.find_one({
         "tenant_id": tenant_id,
         "user_id": user_id,
@@ -44,7 +47,8 @@ async def get_or_create_freemium_enrollment(
     return freemium_enrollment
 
 
-async def get_freemium_quota(tenant_id: str) -> object:  # ruff:ignore[unused-async]
+def get_freemium_quota(tenant_id: str) -> object:
+    """Get freemium quota for a tenant."""
     return None
     FreemiumQuota(bundles=[Bundle(asset="token", quota=20)], days=1, variant=None)
 
@@ -56,7 +60,8 @@ async def use_freemium_quota(
     amount: Decimal,
     variant: str | None = None,
 ) -> None:
-    freemium_quota = await get_freemium_quota(tenant_id)
+    """Use freemium quota for a user."""
+    freemium_quota = get_freemium_quota(tenant_id)
     if freemium_quota is None:
         return
 
@@ -125,6 +130,7 @@ async def select_enrollment(
     variant: str | None = None,
     enrollment_id: str | None = None,
 ) -> tuple[list[tuple[Enrollment, Decimal]], Decimal]:
+    """Select active enrollments to cover a usage amount."""
     residual = amount
     selected_enrollments = []
 
@@ -136,9 +142,7 @@ async def select_enrollment(
         enrollment_id=enrollment_id,
     )
 
-    import logging
-
-    logging.info("%s\n%s", datetime.now(), Enrollment.summaries(active_enrollments))
+    logger.info("%s\n%s", datetime.now(), Enrollment.summaries(active_enrollments))
 
     for enrollment in active_enrollments:
         using = await use_enrollment_quota(
@@ -166,6 +170,7 @@ async def create_usage(
     meta_data: dict | None = None,
     borrow: bool = False,
 ) -> Usage:
+    """Create a usage record by consuming from active enrollments."""
     enrollment_quotas, residual = await select_enrollment(
         tenant_id=tenant_id,
         user_id=user_id,

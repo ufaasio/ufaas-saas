@@ -1,4 +1,4 @@
-"""FastAPI application setup."""
+"""FastAPI application factory."""
 
 from fastapi import APIRouter
 from fastapi_mongo_base.core import app_factory
@@ -9,7 +9,7 @@ from apps.usage.routes import router as usage_router
 from . import config
 
 app = app_factory.create_app(
-    settings=config.Settings()
+    settings=config.Settings()  # ,  lifespan_func=lifespan,
 )
 server_router = APIRouter()
 
