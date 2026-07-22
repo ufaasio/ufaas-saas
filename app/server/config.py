@@ -14,7 +14,7 @@ dotenv.load_dotenv()
 class Settings(config.Settings):
     """Application settings."""
 
-    project_name: str = os.getenv("PROJECT_NAME")
+    project_name: str = os.getenv("PROJECT_NAME", "saas")
     base_dir: Path = Path(__file__).resolve().parent.parent
     base_path: str = f"/api/{project_name}/v1"
 
@@ -30,7 +30,7 @@ class Settings(config.Settings):
         log_config = {
             "formatters": {
                 "standard": {
-                    "format": "[{levelname} {name} : {filename}:{lineno} : {asctime} -> {funcName:10}] {message}",  # noqa: E501
+                    "format": "[{levelname} {name} : {filename}:{lineno} : {asctime} -> {funcName:10}] {message}",  # ruff:ignore[line-too-long]
                     "style": "{",
                 }
             },

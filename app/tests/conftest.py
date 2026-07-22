@@ -1,16 +1,25 @@
-"""Test configuration and fixtures."""
+"""Test fixtures and configuration."""
 
+import asyncio
 import logging
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timedelta
+from unittest import mock
+
+os.environ.setdefault("PROJECT_NAME", "saas")
+if not os.environ.get("API_KEY"):
+    os.environ["API_KEY"] = "test-api-key"
 
 import httpx
 import pytest
 import pytest_asyncio
 from beanie import init_beanie
 from fastapi_mongo_base import models as base_mongo_models
+from fastapi_mongo_base.utils import usso_routes
 from fastapi_mongo_base.utils.basic import get_all_subclasses
+from usso import UserData
+from usso.auth import UssoAuth
 
 from apps.enrollment.models import Enrollment
 from server.config import Settings
@@ -24,11 +33,49 @@ logger = logging.getLogger("tests.conftest")
 def setup_debugpy() -> None:
     """Set up debugpy for remote debugging."""
     if os.getenv("DEBUGPY", "False").lower() in ("true", "1", "yes"):
-        import debugpy  # noqa: T100
+        import debugpy  # ruff:ignore[debugger]
 
-        debugpy.listen(("127.0.0.1", 3020))  # noqa: T100
+        debugpy.listen(("127.0.0.1", 3020))  # ruff:ignore[debugger]
         logger.info("Waiting for debugpy client")
-        debugpy.wait_for_client()  # noqa: T100
+        debugpy.wait_for_client()  # ruff:ignore[debugger]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_usso() -> Generator[None]:
+    """Mock USSO auth so tests do not call external HTTP services."""
+
+    def mock_user_data(self: UssoAuth, api_key: str) -> UserData:
+        return UserData(
+            sub=StaticData.user_id_1_1,
+            tenant_id=StaticData.tenant_id_1,
+            scopes=["*:*"],
+        )
+
+    async def mock_get_user(
+        self: usso_routes.AbstractUSSORouterBase,
+        request: object,
+        **kwargs: object,
+    ) -> UserData:
+        await asyncio.sleep(0)
+        return UserData(
+            sub=StaticData.user_id_1_1,
+            tenant_id=StaticData.tenant_id_1,
+            scopes=["*:*"],
+        )
+
+    patchers = [
+        mock.patch.object(UssoAuth, "user_data_from_api_key", mock_user_data),
+        mock.patch.object(
+            usso_routes.AbstractUSSORouterBase,
+            "get_user",
+            mock_get_user,
+        ),
+    ]
+    for patcher in patchers:
+        patcher.start()
+    yield
+    for patcher in patchers:
+        patcher.stop()
 
 
 @pytest.fixture(scope="session")
@@ -39,7 +86,6 @@ def mongo_client() -> AsyncGenerator[object]:
     yield AsyncMongoMockClient()
 
 
-# Async setup function to initialize the database with Beanie
 async def init_db(mongo_client: object) -> None:
     """Initialize the database with Beanie."""
     database = mongo_client.get_database("test_db")
@@ -78,7 +124,7 @@ async def authenticated_client(
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fastapi_app),
         base_url=client.base_url,
-        headers={"x-api-key": os.getenv("API_KEY")},
+        headers={"x-api-key": os.environ["API_KEY"]},
     ) as ac:
         yield ac
 
@@ -156,11 +202,12 @@ async def enrollments(
             )
             await enrollment.save()
             enrollments.append(enrollment)
-    except Exception as e:
+    except Exception:
         import traceback
 
-        traceback_str = "".join(traceback.format_tb(e.__traceback__))
-
+        traceback_str = "".join(traceback.format_tb(
+            __import__("sys").exc_info()[2]
+        ))
         logger.exception("create base enrollments: \n%s", traceback_str)
     yield enrollments
 

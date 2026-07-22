@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "beanie>=2.1.0",
-    "fastapi-mongo-base>=1.5.7",
+    "fastapi-mongo-base>=1.6.0",
     "httpx>=0.28.1",
     "python-dotenv>=1.2.2",
     "ufaas>=0.5.4",
@@ -65,10 +65,26 @@ select = [
     "ERA",   # remove commented code
     "RUF",   # ruff-specific improvements
 ]
-ignore = ["COM812", "B008", "D202", "D203", "D209", "D212", "D413"]
+ignore = [
+    "raise-vanilla-args",
+    "missing-trailing-comma",
+    "function-call-in-default-argument",
+    "blank-line-after-function",
+    "incorrect-blank-line-before-class",
+    "new-line-after-last-paragraph",
+    "multi-line-summary-first-line",
+    "missing-blank-line-after-last-section",
+]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101"]
+"tests/*" = [
+    "logging-f-string",
+    "assert",
+    "hardcoded-password-string",
+    "hardcoded-password-func-arg",
+    "assert-raises-exception",
+]
+"server/db.py" = ["TRY"]
 
 
 [tool.ruff.format]
