@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from fastapi_mongo_base.utils.mongo_aggregate import aggregate_to_list
 from pymongo import ASCENDING, DESCENDING
 
 from apps.config.models import Configuration
@@ -36,11 +37,8 @@ async def get_active_enrollments(
         {"$sort": {"variant": DESCENDING, "expiry_sort": ASCENDING}},
     ]
 
-    active_enrollments = [
-        Enrollment(**record) async for record in Enrollment.aggregate(pipeline)
-    ]
-
-    return active_enrollments
+    records = await aggregate_to_list(Enrollment, pipeline)
+    return [Enrollment(**record) for record in records]
 
 
 async def borrow_enrollment(

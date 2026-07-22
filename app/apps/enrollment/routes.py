@@ -261,7 +261,7 @@ class EnrollmentRouter(usso_routes.AbstractTenantUSSORouter):
             **data.model_dump(exclude=["user_id"]),
         )
         await item.save()
-        return self.schema.model_validate(
+        return self.retrieve_response_schema(
             **item.model_dump(), leftover_bundles=await item.get_leftover_bundles()
         )
 

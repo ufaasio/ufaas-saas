@@ -89,6 +89,15 @@ def mongo_client() -> AsyncGenerator[object]:
 async def init_db(mongo_client: object) -> None:
     """Initialize the database with Beanie."""
     database = mongo_client.get_database("test_db")
+    original_list_collection_names = database.list_collection_names
+
+    async def list_collection_names(*args: object, **kwargs: object) -> list[str]:
+        # Beanie 2 / PyMongo pass kwargs mongomock_motor does not accept.
+        kwargs.pop("authorizedCollections", None)
+        kwargs.pop("nameOnly", None)
+        return await original_list_collection_names(*args, **kwargs)
+
+    database.list_collection_names = list_collection_names
     await init_beanie(
         database=database,
         document_models=get_all_subclasses(base_mongo_models.BaseEntity),
@@ -111,7 +120,7 @@ async def client() -> AsyncGenerator[httpx.AsyncClient]:
     """Fixture to provide an AsyncClient for FastAPI app."""
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=fastapi_app),
-        base_url=f"https://test.uln.me{Settings.base_path}",
+        base_url=f"{Settings.root_url}{Settings.base_path}",
     ) as ac:
         yield ac
 
