@@ -95,7 +95,6 @@ class Enrollment(EnrollmentSchema, TenantUserEntity):
                     "$or": [
                         {"expire_at": {"$gt": now}},
                         {"expire_at": None},
-
                     ]
                 },
                 {

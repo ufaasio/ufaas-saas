@@ -214,9 +214,7 @@ async def enrollments(
     except Exception:
         import traceback
 
-        traceback_str = "".join(traceback.format_tb(
-            __import__("sys").exc_info()[2]
-        ))
+        traceback_str = "".join(traceback.format_tb(__import__("sys").exc_info()[2]))
         logger.exception("create base enrollments: \n%s", traceback_str)
     yield enrollments
 
