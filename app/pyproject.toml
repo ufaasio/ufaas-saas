@@ -1,6 +1,6 @@
 [project]
 name = "saas"
-version = "0.2.0"
+version = "0.2.1"
 description = "SaaS application for managing user bundles and enrollments, providing subscription management and user onboarding capabilities"
 readme = "README.md"
 requires-python = ">=3.13"
